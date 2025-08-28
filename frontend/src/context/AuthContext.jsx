@@ -1,5 +1,5 @@
 import { createContext, useState, useEffect } from 'react';
-import { login as loginAPI, register as registerAPI, logout as logoutAPI, getCurrentUser } from '../api/auth';
+import { getCsrf, login as loginAPI, register as registerAPI, logout as logoutAPI, getCurrentUser } from '../api/auth';
 
 export const AuthContext = createContext();
 
@@ -11,16 +11,10 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        // Check if we have a token in localStorage
-        const token = localStorage.getItem('auth_token');
-        if (token) {
-          // Try to get current user from backend
-          const response = await getCurrentUser();
-          setUser(response.data);
-        }
+        const response = await getCurrentUser();
+        setUser(response.data);
       } catch (error) {
         console.error('Auth check failed:', error);
-        // Clear invalid token
         localStorage.removeItem('auth_token');
         localStorage.removeItem('user');
       } finally {
@@ -34,6 +28,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       setLoading(true);
+      await getCsrf();
       const response = await loginAPI({ email, password });
       
       const { user: userData, token } = response.data;
@@ -58,6 +53,7 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     try {
       setLoading(true);
+      await getCsrf();
       const response = await registerAPI(userData);
       
       const { user: newUser, token } = response.data;

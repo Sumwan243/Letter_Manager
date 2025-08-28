@@ -1,28 +1,28 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:8000/api', // Laravel API base
+  // Use site root; prefix paths with /api in callers
+  baseURL: 'http://localhost:8000',
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000, // 10 second timeout
+  timeout: 10000,
 });
 
-// Request interceptor to add auth token
+// Attach Bearer token from localStorage and log requests
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('auth_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
     console.log('API Request:', {
       method: config.method?.toUpperCase(),
       url: config.url,
       headers: config.headers,
       data: config.data
     });
-    
     return config;
   },
   (error) => {
@@ -48,16 +48,6 @@ api.interceptors.response.use(
       message: error.message,
       response: error.response?.data
     });
-    
-    if (error.response?.status === 401) {
-      // Token expired or invalid, clear local storage
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user');
-      // Redirect to login page if not already there
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
-    }
     return Promise.reject(error);
   }
 );

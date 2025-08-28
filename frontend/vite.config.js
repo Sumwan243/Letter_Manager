@@ -14,4 +14,20 @@ export default defineConfig({
       'ziggy-js': resolve(__dirname, '../vendor/tightenco/ziggy'), // updated relative path after folder move
     },
   },
+
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/sanctum': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+    cors: true,
+  },
 });

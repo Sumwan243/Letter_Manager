@@ -1,34 +1,19 @@
 import api from './axios';
 
-// User registration
-export const register = (userData) => api.post('/auth/register', userData);
+// Sanctum CSRF cookie
+export const getCsrf = () => api.get('/sanctum/csrf-cookie');
 
-// User login
-export const login = (credentials) => api.post('/auth/login', credentials);
+// Auth endpoints (backend prefixes these under /api/auth for login/register)
+export const register = (userData) => api.post('/api/auth/register', userData);
+export const login = (credentials) => api.post('/api/auth/login', credentials);
+export const logout = () => api.post('/api/logout');
+export const getCurrentUser = () => api.get('/api/user');
 
-// User logout
-export const logout = () => api.post('/auth/logout');
-
-// Get current authenticated user
-export const getCurrentUser = () => api.get('/auth/user');
-
-// Refresh authentication token
-export const refreshToken = () => api.post('/auth/refresh');
-
-// Check if user is authenticated
-export const checkAuth = () => api.get('/auth/check');
-
-// Update user profile
-export const updateProfile = (userData) => api.put('/auth/profile', userData);
-
-// Change password
-export const changePassword = (passwordData) => api.put('/auth/password', passwordData);
-
-// Forgot password
-export const forgotPassword = (email) => api.post('/auth/forgot-password', { email });
-
-// Reset password
-export const resetPassword = (resetData) => api.post('/auth/reset-password', resetData);
+// Optional utilities (adjust if implemented on backend)
+export const updateProfile = (userData) => api.put('/api/auth/profile', userData);
+export const changePassword = (passwordData) => api.put('/api/auth/password', passwordData);
+export const forgotPassword = (email) => api.post('/api/auth/forgot-password', { email });
+export const resetPassword = (resetData) => api.post('/api/auth/reset-password', resetData);
 
 
 
