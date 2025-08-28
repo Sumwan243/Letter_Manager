@@ -1,0 +1,8 @@
+/* resources/css/app.css */
+
+/* Keep empty OR only include shared fonts / resets if you want */
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap');
+
+body {
+  font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+}
