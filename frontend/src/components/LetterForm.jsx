@@ -5,6 +5,7 @@ export default function LetterForm({ letterTypes, onSubmit, submitting }) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [fields, setFields] = useState({});
+  const [mode, setMode] = useState('template'); // 'template' | 'blank'
 
   const selected = useMemo(
     () => letterTypes.find(t => String(t.id) === String(letterTypeId)),
@@ -22,7 +23,7 @@ export default function LetterForm({ letterTypes, onSubmit, submitting }) {
       title,
       content,
       letter_type_id: Number(letterTypeId),
-      fields,
+      fields: mode === 'template' ? fields : {},
       status: 'draft',
     });
   };
@@ -35,6 +36,30 @@ export default function LetterForm({ letterTypes, onSubmit, submitting }) {
         </h3>
 
         <div className="space-y-6">
+          {/* Mode Toggle */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Mode
+            </label>
+            <div className="inline-flex rounded-md shadow-sm" role="group">
+              <button
+                type="button"
+                onClick={() => setMode('template')}
+                className={`px-4 py-2 text-sm font-medium border ${mode === 'template' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600'}`}
+              >
+                Use Template
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('blank')}
+                className={`px-4 py-2 text-sm font-medium border-t border-b border-r ${mode === 'blank' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600'}`}
+              >
+                Blank Letter
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-gray-500">Templates add extra fields. Blank lets you write freeform content.</p>
+          </div>
+
           {/* Letter Type Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -83,7 +108,7 @@ export default function LetterForm({ letterTypes, onSubmit, submitting }) {
           </div>
 
           {/* Dynamic Fields */}
-          {selected?.template_fields && (
+          {mode === 'template' && selected?.template_fields && (
             <div className="space-y-4">
               <div className="border-t border-gray-200 dark:border-gray-600 pt-4">
                 <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">

@@ -21,7 +21,9 @@ export default function AdminDashboard() {
       try {
         setLoading(true);
         const response = await fetchLetters();
-        const letters = response.data;
+        const letters = Array.isArray(response.data)
+          ? response.data
+          : (Array.isArray(response.data?.data) ? response.data.data : (response.data?.letters || []));
         
         // Group letters by user
         const lettersGrouped = {};

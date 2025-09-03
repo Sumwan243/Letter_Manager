@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 const api = axios.create({
-  // Use site root; prefix paths with /api in callers
-  baseURL: 'http://localhost:8000',
+  // Use same-origin; Vite proxy forwards /api and /sanctum to backend
+  baseURL: '/',
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',

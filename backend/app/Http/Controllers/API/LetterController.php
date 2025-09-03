@@ -38,28 +38,21 @@ class LetterController extends Controller
         $user = Auth::user();
         
         $request->validate([
-            'title' => 'nullable|string|max:255',
-            'content' => 'nullable|string',
+            'title' => 'required|string|min:1|max:255',
+            'content' => 'required|string|min:1',
             'letter_type_id' => 'required|exists:letter_types,id',
             'fields' => 'nullable|array',
             'status' => 'nullable|string|in:draft,pending,approved,rejected',
         ]);
 
         $fields = (array) $request->input('fields', []);
-        $derivedTitle = $request->input('title');
-        if ($derivedTitle === null || $derivedTitle === '') {
-            $derivedTitle = $fields['subject'] ?? 'Untitled Letter';
-        }
-
-        $derivedContent = $request->input('content');
-        if ($derivedContent === null) {
-            $derivedContent = '';
-        }
+        $title = trim((string) $request->input('title'));
+        $content = trim((string) $request->input('content'));
 
         $letter = Letter::create([
             'user_id' => $user->id,
-            'title' => $derivedTitle,
-            'content' => $derivedContent,
+            'title' => $title,
+            'content' => $content,
             'letter_type_id' => $request->input('letter_type_id'),
             'fields' => $fields,
             'status' => $request->input('status', 'draft'),
