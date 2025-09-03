@@ -17,6 +17,8 @@ export default function Letters() {
   const [showForm, setShowForm] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [viewingLetter, setViewingLetter] = useState(null);
+  const [editingLetter, setEditingLetter] = useState(null);
 
   // Debug logging
   console.log('Rendering Letters with:', { user, loading, error, letters });
@@ -265,6 +267,72 @@ export default function Letters() {
           </div>
         </div>
 
+        {/* View Letter Modal */}
+        {viewingLetter && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-2xl">
+              <h2 className="text-2xl font-bold mb-4">{viewingLetter.title}</h2>
+              <p className="mb-4">{viewingLetter.content}</p>
+              <h3 className="text-lg font-semibold mt-6 mb-2">Additional Details</h3>
+              <div className="grid grid-cols-2 gap-4">
+                {Object.entries(viewingLetter.fields).map(([key, value]) => (
+                  <div key={key}>
+                    <strong className="capitalize">{key.replace(/_/g, ' ')}:</strong> {value}
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => setViewingLetter(null)} className="mt-6 px-4 py-2 bg-blue-600 text-white rounded-lg">Close</button>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Letter Modal */}
+        {editingLetter && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-8 w-full max-w-2xl my-8">
+              <h2 className="text-2xl font-bold mb-4">Edit Letter</h2>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const updatedFields = { ...editingLetter.fields };
+                const formData = new FormData(e.target);
+                for (let [key, value] of formData.entries()) {
+                  if (key !== 'title' && key !== 'content') {
+                    updatedFields[key] = value;
+                  }
+                }
+                handleLetterUpdate(editingLetter.id, {
+                  title: formData.get('title'),
+                  content: formData.get('content'),
+                  fields: updatedFields,
+                });
+                setEditingLetter(null);
+              }}>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Title</label>
+                    <input type="text" name="title" defaultValue={editingLetter.title} className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Content</label>
+                    <textarea name="content" defaultValue={editingLetter.content} rows="5" className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
+                  </div>
+                  <h3 className="text-lg font-semibold pt-4 border-t border-gray-200 dark:border-gray-600">Additional Details</h3>
+                  {Object.entries(editingLetter.fields).map(([key, value]) => (
+                    <div key={key}>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 capitalize">{key.replace(/_/g, ' ')}</label>
+                      <input type="text" name={key} defaultValue={value} className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" />
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-6 flex justify-end space-x-4">
+                  <button type="button" onClick={() => setEditingLetter(null)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancel</button>
+                  <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Changes</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 mb-6">
           <div className="border-b border-gray-100 dark:border-gray-700">
@@ -335,28 +403,12 @@ export default function Letters() {
                           </div>
 
                           <div className="flex flex-col space-y-2 ml-4">
-                            <button className="px-3 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200">
+                            <button onClick={() => setViewingLetter(letter)} className="px-3 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200">
                               View
                             </button>
-                            <button className="px-3 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded-full hover:bg-green-200 dark:hover:bg-green-800 transition-colors duration-200">
+                            <button onClick={() => setEditingLetter(letter)} className="px-3 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded-full hover:bg-green-200 dark:hover:bg-green-800 transition-colors duration-200">
                               Edit
                             </button>
-                            {user?.role === 'admin' && (
-                              <div className="space-y-1">
-                                <button
-                                  onClick={() => handleStatusChange(letter.id, 'approved')}
-                                  className="px-3 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded-full hover:bg-green-200 dark:hover:bg-green-800 transition-colors duration-200 w-full"
-                                >
-                                  Approve
-                                </button>
-                                <button
-                                  onClick={() => handleStatusChange(letter.id, 'rejected')}
-                                  className="px-3 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded-full hover:bg-red-200 dark:hover:bg-red-800 transition-colors duration-200 w-full"
-                                >
-                                  Reject
-                                </button>
-                              </div>
-                            )}
                             <button
                               onClick={() => handleLetterDelete(letter.id)}
                               className="px-3 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded-full hover:bg-red-200 dark:hover:bg-red-800 transition-colors duration-200"
