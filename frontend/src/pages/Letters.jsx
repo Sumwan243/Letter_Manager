@@ -81,7 +81,8 @@ export default function Letters() {
         const response = await fetchLetters();
         console.log('Letters response:', response);
 
-        const data = Array.isArray(response.data) ? response.data : response.data?.letters || [];
+        // Handle Laravel's paginated response
+        const data = response.data?.data || (Array.isArray(response.data) ? response.data : []);
         setLetters(data);
       } catch (err) {
         console.error('Error fetching letters:', err);
@@ -201,7 +202,7 @@ export default function Letters() {
     try {
       setRefreshing(true);
       const response = await fetchLetters();
-      const data = Array.isArray(response.data) ? response.data : response.data?.letters || [];
+        const data = response.data?.data || (Array.isArray(response.data) ? response.data : []);
       setLetters(data);
     } catch (err) {
       console.error('Error refreshing letters:', err);
