@@ -2,7 +2,7 @@ import { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import DynamicForm from '../components/DynamicForm';
-import { fetchLetters, createLetter, updateLetter, deleteLetter, updateLetterStatus } from '../api/letters';
+import { fetchLetters, createLetter, updateLetter, deleteLetter, updateLetterStatus, fetchLetterTypes } from '../api/letters';
 import { mockLetterTypes } from '../utils/mockData';
 
 export default function Letters() {
@@ -131,7 +131,7 @@ export default function Letters() {
       const response = await createLetter(letterData);
 
       console.log('API Response:', response);
-      const createdLetter = response.data;
+      const createdLetter = response.data?.letter;
 
       if (createdLetter) {
         setLetters(prev => [createdLetter, ...prev]);
@@ -164,7 +164,7 @@ export default function Letters() {
   const handleLetterUpdate = async (letterId, updates) => {
     try {
       const response = await updateLetter(letterId, updates);
-      const updatedLetter = response.data;
+      const updatedLetter = response.data?.letter;
       if (updatedLetter) {
         setLetters(prev => prev.map(letter => letter.id === letterId ? updatedLetter : letter));
       }

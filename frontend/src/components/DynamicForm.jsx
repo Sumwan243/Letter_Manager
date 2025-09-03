@@ -285,7 +285,7 @@ export default function DynamicForm({ typeId, onLetterCreated }) {
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {fields.map((field) => (
-              <div key={field.id} className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
+                <div key={field.name} className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   {getFieldLabel(field.name)}
                   {field.required && <span className="text-red-500 ml-1">*</span>}
