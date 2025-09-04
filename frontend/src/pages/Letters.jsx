@@ -16,6 +16,9 @@ export default function Letters() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [viewingLetter, setViewingLetter] = useState(null);
+  const [editingLetter, setEditingLetter] = useState(null);
+  const [editMode, setEditMode] = useState(false);
 
   // Debug logging
   console.log('Rendering Letters with:', { user, loading, error, letters });
@@ -51,17 +54,12 @@ export default function Letters() {
           setLetterTypes(response.data);
           console.log('Loaded letter types from API:', response.data.length);
         } else {
-          // Fallback to mock data if API doesn't return data
-          console.log('API returned no data, using mock data...');
-          setLetterTypes(mockLetterTypes);
-          console.log('Loaded letter types from mock data:', mockLetterTypes.length);
+          console.log('API returned no data');
+          setLetterTypes([]);
         }
       } catch (err) {
         console.error('Error loading letter types from API:', err);
-        console.log('Falling back to mock data...');
-        // Fallback to mock data on API error
-        setLetterTypes(mockLetterTypes);
-        console.log('Loaded letter types from mock data:', mockLetterTypes.length);
+        setLetterTypes([]);
       } finally {
         setLoading(false);
       }
@@ -170,6 +168,21 @@ export default function Letters() {
       console.error('Error updating letter:', err);
       alert(`Failed to update letter: ${err.message}`);
     }
+  };
+
+  const handleLetterEdit = (letter) => {
+    setEditingLetter(letter);
+    setEditMode(true);
+    setActiveTab('create');
+    setSelectedType(letter.letter_type_id);
+  };
+
+  const handleLetterView = (letter) => {
+    setViewingLetter(letter);
+  };
+
+  const closeLetterView = () => {
+    setViewingLetter(null);
   };
 
   const handleLetterDelete = async (letterId) => {
@@ -332,10 +345,10 @@ export default function Letters() {
                           </div>
 
                           <div className="flex flex-col space-y-2 ml-4">
-                            <button className="px-3 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200">
+                            <button onClick={() => handleLetterView(letter)} className="px-3 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200">
                               View
                             </button>
-                            <button className="px-3 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded-full hover:bg-green-200 dark:hover:bg-green-800 transition-colors duration-200">
+                            <button onClick={() => handleLetterEdit(letter)} className="px-3 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded-full hover:bg-green-200 dark:hover:bg-green-800 transition-colors duration-200">
                               Edit
                             </button>
                             {user?.role === 'admin' && (
@@ -395,7 +408,12 @@ export default function Letters() {
 
                   {selectedType && (
                     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg p-6">
-                      <DynamicForm typeId={selectedType} onLetterCreated={handleLetterCreated} />
+                      <DynamicForm 
+                        typeId={selectedType} 
+                        onLetterCreated={editMode ? handleLetterUpdate : handleLetterCreated}
+                        editingLetter={editingLetter}
+                        editMode={editMode}
+                      />
                     </div>
                   )}
                 </div>
@@ -405,6 +423,126 @@ export default function Letters() {
           </div>
         </div>
       </div>
+
+      {/* Letter View Modal */}
+      {viewingLetter && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                {viewingLetter.title || 'Letter View'}
+              </h2>
+              <button
+                onClick={closeLetterView}
+                className="px-4 py-2 text-sm rounded-lg bg-red-100 dark:bg-red-700 text-red-700 dark:text-red-200 hover:bg-red-200 dark:hover:bg-red-600 font-medium"
+              >
+                ✕ Close
+              </button>
+            </div>
+            
+            <div className="p-8 bg-gray-50 dark:bg-gray-800/50 overflow-auto" style={{ maxHeight: 'calc(90vh - 120px)' }}>
+              {/* A4 Paper Layout */}
+              <div 
+                className="mx-auto bg-white text-gray-900 shadow-lg print:shadow-none"
+                style={{ 
+                  width: '210mm', 
+                  minHeight: '297mm', 
+                  padding: '20mm',
+                  boxSizing: 'border-box',
+                  backgroundColor: 'white'
+                }}
+              >
+                {/* Letter Header */}
+                <div className="flex justify-between items-start mb-8">
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                      {viewingLetter.title || 'Letter Title'}
+                    </h1>
+                    <p className="text-sm text-gray-600">
+                      Type: <span className="font-medium">{viewingLetter.letter_type?.name || 'Unknown'}</span>
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Status: <span className={`font-medium ${getStatusColor(viewingLetter.status)}`}>{viewingLetter.status || 'Draft'}</span>
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-gray-600">
+                      {viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      }) : 'Date'}
+                    </p>
+                  </div>
+                </div>
+
+                <hr className="border-gray-300 mb-6" />
+
+                {/* Letter Content */}
+                <div className="space-y-6">
+                  {/* Recipient Section */}
+                  <div>
+                    <p className="font-semibold text-gray-900 mb-2">To:</p>
+                    <p className="text-gray-700">
+                      {(() => {
+                        const fields = viewingLetter.fields || {};
+                        const typeName = viewingLetter.letter_type?.name?.toLowerCase() || '';
+                        
+                        if (typeName.includes('meeting')) {
+                          return fields.attendees || fields.target_audience || 'Team Members';
+                        } else if (typeName.includes('job') || typeName.includes('application')) {
+                          return fields.hiring_manager_name || fields.recipient_name || 'Hiring Manager';
+                        } else if (typeName.includes('announcement') || typeName.includes('notice')) {
+                          return fields.target_audience || fields.recipient_name || 'All Staff';
+                        } else if (typeName.includes('confirmation') || typeName.includes('receipt')) {
+                          return fields.recipient_name || fields.recipient_company || 'Recipient';
+                        } else if (typeName.includes('professional') || typeName.includes('business')) {
+                          return fields.recipient_name || fields.recipient_company || 'Client/Partner';
+                        } else {
+                          return fields.recipient_name || fields.recipient || fields.to || 'Not specified';
+                        }
+                      })()}
+                    </p>
+                  </div>
+
+                  {/* Main Content */}
+                  <div>
+                    <p className="font-semibold text-gray-900 mb-2">Content:</p>
+                    <div className="text-gray-700 leading-relaxed">
+                      <p className="whitespace-pre-wrap">
+                        {viewingLetter.content || 'No content available'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Additional Fields */}
+                  {viewingLetter.fields && Object.keys(viewingLetter.fields).length > 0 && (
+                    <div>
+                      <p className="font-semibold text-gray-900 mb-3">Additional Details:</p>
+                      <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                        {Object.entries(viewingLetter.fields).map(([key, value]) => (
+                          <div key={key} className="text-sm">
+                            <span className="font-medium text-gray-600 capitalize">
+                              {key.replace(/_/g, ' ')}:
+                            </span>
+                            <span className="text-gray-700 ml-2">{value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sender Information */}
+                  <div className="mt-8 pt-6 border-t border-gray-300">
+                    <p className="font-semibold text-gray-900 mb-2">From:</p>
+                    <p className="text-gray-700">{viewingLetter.user?.name || 'Unknown User'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
