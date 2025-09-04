@@ -2,7 +2,7 @@ import { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import DynamicForm from '../components/DynamicForm';
-import { fetchLetters, createLetter, updateLetter, deleteLetter, updateLetterStatus } from '../api/letters';
+import { fetchLetters, createLetter, updateLetter, deleteLetter, updateLetterStatus, fetchLetterTypes } from '../api/letters';
 
 export default function Letters() {
   const { user } = useContext(AuthContext);
@@ -13,7 +13,7 @@ export default function Letters() {
   const [letters, setLetters] = useState([]);
   const [activeTab, setActiveTab] = useState('view');
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
+
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
@@ -110,7 +110,6 @@ export default function Letters() {
   const handleLetterCreated = async (newLetter) => {
     try {
       if (!newLetter) {
-        setShowForm(false);
         setSelectedType('');
         return;
       }
@@ -137,7 +136,6 @@ export default function Letters() {
         alert('Letter created successfully!');
       }
 
-      setShowForm(false);
       setSelectedType('');
       setActiveTab('view');
     } catch (err) {
@@ -384,34 +382,23 @@ export default function Letters() {
                     </button>
                     <h3 className="text-lg font-medium text-gray-900 dark:text-white">Create New Letter</h3>
                   </div>
-                  {!showForm && (
-                    <button onClick={() => setShowForm(true)} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200">
-                      Start New Letter
-                    </button>
-                  )}
                 </div>
 
-                {!showForm ? (
-                  <div className="text-center py-12">
-                    <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">Ready to create a letter?</h3>
+                <div className="space-y-4">
+                  <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Letter Type</label>
+                    <select value={selectedType} onChange={(e) => setSelectedType(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                      <option value="">Select Letter Type</option>
+                      {letterTypes.map(type => <option key={type.id} value={type.id}>{type.name}</option>)}
+                    </select>
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Letter Type</label>
-                      <select value={selectedType} onChange={(e) => setSelectedType(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                        <option value="">Select Letter Type</option>
-                        {letterTypes.map(type => <option key={type.id} value={type.id}>{type.name}</option>)}
-                      </select>
-                    </div>
 
-                    {selectedType && (
-                      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg p-6">
-                        <DynamicForm typeId={selectedType} onLetterCreated={handleLetterCreated} />
-                      </div>
-                    )}
-                  </div>
-                )}
+                  {selectedType && (
+                    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg p-6">
+                      <DynamicForm typeId={selectedType} onLetterCreated={handleLetterCreated} />
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
