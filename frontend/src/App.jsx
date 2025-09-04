@@ -9,6 +9,7 @@ import StaffDashboard from './pages/StaffDashboard';
 import Dashboard from './pages/Dashboard';
 import Letters from './pages/Letters';
 import CreateLetter from './pages/CreateLetter';
+import LetterTemplateForm from './pages/LetterTemplateForm';
 import PrivateRoute from './components/PrivateRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -61,6 +62,15 @@ export default function App() {
               element={
                 <PrivateRoute roles={['admin', 'staff']}>
                   <CreateLetter />
+                </PrivateRoute>
+              }
+            />
+
+            <Route
+              path="/templates/new"
+              element={
+                <PrivateRoute roles={['admin', 'staff']}>
+                  <LetterTemplateForm />
                 </PrivateRoute>
               }
             />

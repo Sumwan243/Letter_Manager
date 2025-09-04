@@ -38,9 +38,9 @@ class LetterController extends Controller
         $user = Auth::user();
         
         $request->validate([
-            'title' => 'required|string|min:1|max:255',
-            'content' => 'required|string|min:1',
-            'letter_type_id' => 'required|exists:letter_types,id',
+            'title' => 'nullable|string|max:255',
+            'content' => 'nullable|string',
+            'letter_type_id' => 'nullable|exists:letter_types,id',
             'fields' => 'nullable|array',
             'status' => 'nullable|string|in:draft,pending,approved,rejected',
         ]);

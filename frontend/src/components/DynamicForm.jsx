@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
-import { mockLetterTypes } from '../utils/mockData';
 import { fetchLetterTypeById } from '../api/letters';
 
-export default function DynamicForm({ typeId, onLetterCreated }) {
+export default function DynamicForm({ typeId, onLetterCreated, editingLetter, editMode }) {
   const [fields, setFields] = useState([]);
   const [formData, setFormData] = useState({});
   const [loading, setLoading] = useState(true);
@@ -16,21 +15,16 @@ export default function DynamicForm({ typeId, onLetterCreated }) {
     const loadLetterType = async () => {
       try {
         setLoading(true);
-        // First try to find in mock data (fallback)
-        let type = mockLetterTypes.find(t => String(t.id) === String(typeId));
-
-        // If not found in mock data, try to fetch from API
-        if (!type) {
-          try {
-            console.log('Letter type not found in mock data, trying API...');
-            const response = await fetchLetterTypeById(typeId);
-            if (response.data) {
-              type = response.data;
-              console.log('Found letter type from API:', type);
-            }
-          } catch (apiErr) {
-            console.error('Error fetching letter type from API:', apiErr);
+        // Load letter type from API
+        let type = null;
+        try {
+          const response = await fetchLetterTypeById(typeId);
+          if (response.data) {
+            type = response.data;
+            console.log('Loaded letter type from API:', type);
           }
+        } catch (apiErr) {
+          console.error('Error fetching letter type from API:', apiErr);
         }
 
         if (type) {
@@ -47,10 +41,10 @@ export default function DynamicForm({ typeId, onLetterCreated }) {
               Object.entries(type.template_fields).forEach(([fieldName, fieldConfig]) => {
                 if (typeof fieldConfig === 'string') {
                   // Simple field: 'sender_name' => 'text'
-                  transformedFields.push({
+                                    transformedFields.push({
                     name: fieldName,
                     type: fieldConfig,
-                    required: true // Default to required for backend fields
+                    required: false // No required fields
                   });
                 } else if (typeof fieldConfig === 'object' && fieldConfig.type) {
                   // Complex field: 'letter_type' => ['type' => 'select', 'options' => [...]]
@@ -58,7 +52,7 @@ export default function DynamicForm({ typeId, onLetterCreated }) {
                     name: fieldName,
                     type: fieldConfig.type,
                     options: fieldConfig.options || [],
-                    required: true
+                    required: false
                   });
                 }
               });
@@ -67,12 +61,24 @@ export default function DynamicForm({ typeId, onLetterCreated }) {
 
           setFields(transformedFields);
 
-          // Initialize form data with empty values
+          // Initialize form data with existing values or empty values
           const initialData = {};
           transformedFields.forEach(field => {
-            initialData[field.name] = '';
+            if (editMode && editingLetter?.fields?.[field.name]) {
+              initialData[field.name] = editingLetter.fields[field.name];
+            } else {
+              initialData[field.name] = '';
+            }
           });
           setFormData(initialData);
+
+          // Set existing letter data if editing
+          if (editMode && editingLetter) {
+            setLetterData({
+              title: editingLetter.title || '',
+              content: editingLetter.content || ''
+            });
+          }
         } else {
           console.error('Letter type not found:', typeId);
           setFields([]);
@@ -97,25 +103,9 @@ export default function DynamicForm({ typeId, onLetterCreated }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate basic required fields
-    if (!letterData.title.trim()) {
-      alert('Please enter a title for your letter.');
-      return;
-    }
+    // No validation - user can input anything they want
 
-    if (!letterData.content.trim()) {
-      alert('Please enter the content for your letter.');
-      return;
-    }
-
-    // Validate dynamic required fields
-    const requiredFields = fields.filter(f => f.required);
-    const missingFields = requiredFields.filter(f => !formData[f.name]);
-
-    if (missingFields.length > 0) {
-      alert(`Please fill in the following required fields: ${missingFields.map(f => f.name).join(', ')}`);
-      return;
-    }
+    // No required field validation - user can input anything they want
 
     console.log('DynamicForm submitting with data:', {
       title: letterData.title,
@@ -150,7 +140,7 @@ export default function DynamicForm({ typeId, onLetterCreated }) {
     const commonProps = {
       value: formData[field.name] || '',
       onChange: (e) => handleChange(e, field.name),
-      required: field.required,
+      required: false,
       className: "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent"
     };
 
@@ -239,10 +229,10 @@ export default function DynamicForm({ typeId, onLetterCreated }) {
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="border-b border-gray-200 dark:border-gray-600 pb-4 mb-6">
         <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-          {letterType.name} - Letter Details
+          {editMode ? 'Edit' : 'Create'} {letterType.name} - Letter Details
         </h3>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          {letterType.description || 'Fill in the required information for your letter'}
+          {editMode ? 'Update the letter information below' : letterType.description || 'Fill in the required information for your letter'}
         </p>
       </div>
 
@@ -258,7 +248,6 @@ export default function DynamicForm({ typeId, onLetterCreated }) {
             onChange={(e) => setLetterData(prev => ({ ...prev, title: e.target.value }))}
             placeholder="Enter letter title..."
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent"
-            required
           />
         </div>
 
@@ -272,7 +261,6 @@ export default function DynamicForm({ typeId, onLetterCreated }) {
             placeholder="Write your letter content here..."
             rows={8}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
-            required
           />
         </div>
       </div>
@@ -284,11 +272,10 @@ export default function DynamicForm({ typeId, onLetterCreated }) {
             Additional Details
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {fields.map((field) => (
-              <div key={field.id} className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
+            {fields.map((field, index) => (
+              <div key={field.id || `${field.name}-${index}` } className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   {getFieldLabel(field.name)}
-                  {field.required && <span className="text-red-500 ml-1">*</span>}
                 </label>
 
                 {renderField(field)}
@@ -320,7 +307,7 @@ export default function DynamicForm({ typeId, onLetterCreated }) {
           type="submit"
           className="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors duration-200"
         >
-          Create Letter
+          {editMode ? 'Update Letter' : 'Create Letter'}
         </button>
       </div>
     </form>

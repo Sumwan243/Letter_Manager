@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\API\LetterTypeController;
 use App\Http\Controllers\API\LetterController;
+use App\Http\Controllers\API\LetterTemplateController;
 
 // Public routes
 Route::prefix('auth')->group(function () {
@@ -27,6 +28,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/letters/{letter}', [LetterController::class, 'show']);
     Route::put('/letters/{letter}', [LetterController::class, 'update']);
     Route::patch('/letters/{letter}/status', [LetterController::class, 'changeStatus']);
+
+    // Letter template routes
+    Route::apiResource('letter-templates', LetterTemplateController::class);
     
     // Admin-only routes
     Route::middleware('admin')->group(function () {

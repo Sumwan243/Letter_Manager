@@ -62,11 +62,11 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100">
-      <div className="w-full max-w-md p-8 bg-white rounded-xl shadow-lg border border-gray-100">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-100 dark:from-gray-900 dark:to-gray-800">
+      <div className="w-full max-w-md p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Create Account</h1>
-          <p className="text-gray-600">Join our letter management system</p>
+          <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-2">Create Account</h1>
+          <p className="text-gray-600 dark:text-gray-300">Join our letter management system</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
