@@ -185,6 +185,22 @@ export default function Letters() {
     setViewingLetter(null);
   };
 
+  const getLetterLayout = (letterType) => {
+    const typeName = letterType?.name?.toLowerCase() || '';
+    
+    if (typeName.includes('professional') || typeName.includes('business')) {
+      return 'business'; // Formal business letter layout
+    } else if (typeName.includes('job') || typeName.includes('application')) {
+      return 'cover-letter'; // Cover letter layout
+    } else if (typeName.includes('meeting')) {
+      return 'memo'; // Memo layout
+    } else if (typeName.includes('announcement') || typeName.includes('notice')) {
+      return 'announcement'; // Announcement layout
+    } else {
+      return 'standard'; // Default layout
+    }
+  };
+
   const handleLetterDelete = async (letterId) => {
     if (!confirm('Are you sure you want to delete this letter?')) return;
     try {
@@ -351,22 +367,6 @@ export default function Letters() {
                             <button onClick={() => handleLetterEdit(letter)} className="px-3 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded-full hover:bg-green-200 dark:hover:bg-green-800 transition-colors duration-200">
                               Edit
                             </button>
-                            {user?.role === 'admin' && (
-                              <div className="space-y-1">
-                                <button
-                                  onClick={() => handleStatusChange(letter.id, 'approved')}
-                                  className="px-3 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded-full hover:bg-green-200 dark:hover:bg-green-800 transition-colors duration-200 w-full"
-                                >
-                                  Approve
-                                </button>
-                                <button
-                                  onClick={() => handleStatusChange(letter.id, 'rejected')}
-                                  className="px-3 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded-full hover:bg-red-200 dark:hover:bg-red-800 transition-colors duration-200 w-full"
-                                >
-                                  Reject
-                                </button>
-                              </div>
-                            )}
                             <button
                               onClick={() => handleLetterDelete(letter.id)}
                               className="px-3 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded-full hover:bg-red-200 dark:hover:bg-red-800 transition-colors duration-200"
@@ -461,29 +461,60 @@ export default function Letters() {
                     <p className="text-sm text-gray-600">
                       Type: <span className="font-medium">{viewingLetter.letter_type?.name || 'Unknown'}</span>
                     </p>
-                    <p className="text-sm text-gray-600">
-                      Status: <span className={`font-medium ${getStatusColor(viewingLetter.status)}`}>{viewingLetter.status || 'Draft'}</span>
-                    </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-gray-600">
-                      {viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', { 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric' 
-                      }) : 'Date'}
-                    </p>
+                    <p className="font-semibold">{viewingLetter.user?.name || 'Unknown User'}</p>
                   </div>
                 </div>
 
                 <hr className="border-gray-300 mb-6" />
 
-                {/* Letter Content */}
-                <div className="space-y-6">
-                  {/* Recipient Section */}
-                  <div>
-                    <p className="font-semibold text-gray-900 mb-2">To:</p>
-                    <p className="text-gray-700">
+                {/* Letter Layout */}
+                <div className={`space-y-6 ${getLetterLayout(viewingLetter.letter_type) === 'memo' ? 'font-mono' : getLetterLayout(viewingLetter.letter_type) === 'cover-letter' ? 'font-serif' : 'font-sans'}`}>
+                  {/* Company Logo & Header */}
+                  <div className={`flex justify-between items-start ${getLetterLayout(viewingLetter.letter_type) === 'memo' ? 'border-b-2 border-black pb-4 mb-8' : getLetterLayout(viewingLetter.letter_type) === 'announcement' ? 'bg-gray-50 p-4 rounded-lg mb-8' : 'mb-8'}`}>
+                    <div className="flex-1">
+                      {/* Company Logo */}
+                      {viewingLetter.fields?.company_logo && (
+                        <div className="mb-6">
+                          <img 
+                            src={viewingLetter.fields.company_logo} 
+                            alt="Company Logo" 
+                            className="h-32 w-auto object-contain max-w-xs"
+                          />
+                        </div>
+                      )}
+                      {/* Company Name */}
+                      <h2 className="text-xl font-bold text-gray-900 mb-1">
+                        {viewingLetter.fields?.company_name || viewingLetter.fields?.sender_company || 'Company Name'}
+                      </h2>
+                      {/* Company Address */}
+                      {viewingLetter.fields?.address_line1 && (
+                        <p className="text-sm text-gray-600">{viewingLetter.fields.address_line1}</p>
+                      )}
+                      {viewingLetter.fields?.address_line2 && (
+                        <p className="text-sm text-gray-600">{viewingLetter.fields.address_line2}</p>
+                      )}
+                      {viewingLetter.fields?.city && viewingLetter.fields?.state && (
+                        <p className="text-sm text-gray-600">
+                          {viewingLetter.fields.city}, {viewingLetter.fields.state} {viewingLetter.fields?.zip_code}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-gray-600">
+                        {viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        }) : 'Date'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Recipient Address */}
+                  <div className="mt-8">
+                    <div className="text-sm text-gray-700">
                       {(() => {
                         const fields = viewingLetter.fields || {};
                         const typeName = viewingLetter.letter_type?.name?.toLowerCase() || '';
@@ -502,40 +533,58 @@ export default function Letters() {
                           return fields.recipient_name || fields.recipient || fields.to || 'Not specified';
                         }
                       })()}
+                    </div>
+                    {viewingLetter.fields?.recipient_title && (
+                      <div className="text-sm text-gray-700">{viewingLetter.fields.recipient_title}</div>
+                    )}
+                    {viewingLetter.fields?.recipient_company && (
+                      <div className="text-sm text-gray-700">{viewingLetter.fields.recipient_company}</div>
+                    )}
+                    {viewingLetter.fields?.recipient_address && (
+                      <div className="text-sm text-gray-700">{viewingLetter.fields.recipient_address}</div>
+                    )}
+                  </div>
+
+                  {/* Salutation */}
+                  <div className="mt-6">
+                    <p className="text-sm text-gray-700">
+                      Dear {viewingLetter.fields?.recipient_name || viewingLetter.fields?.recipient || 'Sir/Madam'},
                     </p>
                   </div>
 
-                  {/* Main Content */}
-                  <div>
-                    <p className="font-semibold text-gray-900 mb-2">Content:</p>
-                    <div className="text-gray-700 leading-relaxed">
+                  {/* Subject Line */}
+                  {viewingLetter.fields?.subject && (
+                    <div className="mt-4">
+                      <p className="text-sm font-semibold text-gray-900">
+                        Subject: {viewingLetter.fields.subject}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Letter Body */}
+                  <div className="mt-4">
+                    <div className="text-sm text-gray-700 leading-relaxed">
                       <p className="whitespace-pre-wrap">
                         {viewingLetter.content || 'No content available'}
                       </p>
                     </div>
                   </div>
 
-                  {/* Additional Fields */}
-                  {viewingLetter.fields && Object.keys(viewingLetter.fields).length > 0 && (
-                    <div>
-                      <p className="font-semibold text-gray-900 mb-3">Additional Details:</p>
-                      <div className="grid grid-cols-2 gap-x-8 gap-y-3">
-                        {Object.entries(viewingLetter.fields).map(([key, value]) => (
-                          <div key={key} className="text-sm">
-                            <span className="font-medium text-gray-600 capitalize">
-                              {key.replace(/_/g, ' ')}:
-                            </span>
-                            <span className="text-gray-700 ml-2">{value}</span>
-                          </div>
-                        ))}
-                      </div>
+                  {/* Closing */}
+                  <div className="mt-8">
+                    <p className="text-sm text-gray-700 mb-4">Sincerely,</p>
+                    <div className="text-sm text-gray-700">
+                      {viewingLetter.fields?.sender_name || viewingLetter.user?.name || 'Your Name'}
                     </div>
-                  )}
-
-                  {/* Sender Information */}
-                  <div className="mt-8 pt-6 border-t border-gray-300">
-                    <p className="font-semibold text-gray-900 mb-2">From:</p>
-                    <p className="text-gray-700">{viewingLetter.user?.name || 'Unknown User'}</p>
+                    {viewingLetter.fields?.sender_position && (
+                      <div className="text-sm text-gray-700">{viewingLetter.fields.sender_position}</div>
+                    )}
+                    {viewingLetter.fields?.sender_company && (
+                      <div className="text-sm text-gray-700">{viewingLetter.fields.sender_company}</div>
+                    )}
+                    {viewingLetter.fields?.contact_information && (
+                      <div className="text-sm text-gray-600 mt-2">{viewingLetter.fields.contact_information}</div>
+                    )}
                   </div>
                 </div>
               </div>

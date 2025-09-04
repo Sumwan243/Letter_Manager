@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Letter;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class LetterController extends Controller
 {
@@ -48,6 +49,18 @@ class LetterController extends Controller
         $fields = (array) $request->input('fields', []);
         $title = trim((string) $request->input('title'));
         $content = trim((string) $request->input('content'));
+        
+        // Debug logging
+        Log::info('Letter creation attempt', [
+            'user_id' => $user->id,
+            'title' => $title,
+            'letter_type_id' => $request->input('letter_type_id'),
+            'fields_count' => count($fields),
+            'fields_keys' => array_keys($fields),
+            'has_file_fields' => collect($fields)->filter(function($value) {
+                return is_string($value) && str_starts_with($value, 'data:image');
+            })->count()
+        ]);
 
         $letter = Letter::create([
             'user_id' => $user->id,

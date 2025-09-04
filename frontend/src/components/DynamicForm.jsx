@@ -113,6 +113,15 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
       letter_type_id: typeId,
       fields: formData
     });
+    
+    // Check if there are any file fields
+    const fileFields = Object.entries(formData).filter(([key, value]) => 
+      value && typeof value === 'string' && value.startsWith('data:image')
+    );
+    if (fileFields.length > 0) {
+      console.log('File fields found:', fileFields.map(([key]) => key));
+      console.log('Total data size:', JSON.stringify(formData).length);
+    }
 
     // Call the callback with the complete form data
     if (onLetterCreated) {
@@ -138,6 +147,8 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
     const fieldOptions = field.options || (field[field.name] && field[field.name].options) || [];
 
     const commonProps = {
+      id: field.name,
+      name: field.name,
       value: formData[field.name] || '',
       onChange: (e) => handleChange(e, field.name),
       required: false,
@@ -194,6 +205,49 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
           />
         );
 
+      case 'file':
+        return (
+          <div>
+            <input
+              id={field.name}
+              name={field.name}
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) {
+                  console.log('File selected:', file.name, 'Size:', file.size, 'Type:', file.type);
+                  
+                  // Check file size (limit to 5MB)
+                  if (file.size > 5 * 1024 * 1024) {
+                    alert('File too large. Please select an image smaller than 5MB.');
+                    return;
+                  }
+                  
+                  const reader = new FileReader();
+                  reader.onload = (e) => {
+                    console.log('File converted to base64, length:', e.target.result.length);
+                    handleChange({ target: { value: e.target.result } }, field.name);
+                  };
+                  reader.onerror = (error) => {
+                    console.error('Error reading file:', error);
+                    alert('Error reading file. Please try again.');
+                  };
+                  reader.readAsDataURL(file);
+                }
+              }}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            />
+            {formData[field.name] && (
+              <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg">
+                <p className="text-sm text-green-700 dark:text-green-300">
+                  ✓ Logo uploaded successfully
+                </p>
+              </div>
+            )}
+          </div>
+        );
+
       default:
         return (
           <input
@@ -239,10 +293,12 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
       {/* Basic Letter Information */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <label htmlFor="letter-title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Title <span className="text-red-500">*</span>
           </label>
           <input
+            id="letter-title"
+            name="title"
             type="text"
             value={letterData.title}
             onChange={(e) => setLetterData(prev => ({ ...prev, title: e.target.value }))}
@@ -252,10 +308,12 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
         </div>
 
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <label htmlFor="letter-content" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Content <span className="text-red-500">*</span>
           </label>
           <textarea
+            id="letter-content"
+            name="content"
             value={letterData.content}
             onChange={(e) => setLetterData(prev => ({ ...prev, content: e.target.value }))}
             placeholder="Write your letter content here..."
@@ -265,16 +323,16 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
         </div>
       </div>
 
-      {/* Dynamic Fields */}
+      {/* Letter Fields */}
       {fields.length > 0 && (
         <div className="border-t border-gray-200 dark:border-gray-600 pt-6 mt-6">
           <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">
-            Additional Details
+            Letter Information
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {fields.map((field, index) => (
               <div key={field.id || `${field.name}-${index}` } className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor={field.name} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   {getFieldLabel(field.name)}
                 </label>
 
