@@ -2,7 +2,7 @@ import { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import DynamicForm from '../components/DynamicForm';
-import { fetchLetters, createLetter, updateLetter, deleteLetter, updateLetterStatus, fetchLetterTypes } from '../api/letters';
+import { fetchLetters, createLetter, updateLetter, deleteLetter, updateLetterStatus } from '../api/letters';
 
 export default function Letters() {
   const { user } = useContext(AuthContext);
@@ -16,10 +16,6 @@ export default function Letters() {
   const [showForm, setShowForm] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewLetter, setPreviewLetter] = useState(null);
-  const [editMode, setEditMode] = useState(false);
-  const [editingLetter, setEditingLetter] = useState(null);
 
   // Debug logging
   console.log('Rendering Letters with:', { user, loading, error, letters });
@@ -28,8 +24,8 @@ export default function Letters() {
   if (letters && letters.length > 0) {
     console.log('First letter structure:', letters[0]);
     console.log('First letter keys:', Object.keys(letters[0]));
-    if (letters[0].letterType) {
-      console.log('LetterType structure:', letters[0].letterType);
+    if (letters[0].letter_type) {
+      console.log('LetterType structure:', letters[0].letter_type);
     }
     if (letters[0].user) {
       console.log('User structure:', letters[0].user);
@@ -55,12 +51,17 @@ export default function Letters() {
           setLetterTypes(response.data);
           console.log('Loaded letter types from API:', response.data.length);
         } else {
-          console.log('API returned no data');
-          setLetterTypes([]);
+          // Fallback to mock data if API doesn't return data
+          console.log('API returned no data, using mock data...');
+          setLetterTypes(mockLetterTypes);
+          console.log('Loaded letter types from mock data:', mockLetterTypes.length);
         }
       } catch (err) {
         console.error('Error loading letter types from API:', err);
-        setLetterTypes([]);
+        console.log('Falling back to mock data...');
+        // Fallback to mock data on API error
+        setLetterTypes(mockLetterTypes);
+        console.log('Loaded letter types from mock data:', mockLetterTypes.length);
       } finally {
         setLoading(false);
       }
@@ -117,9 +118,9 @@ export default function Letters() {
       console.log('Creating letter:', newLetter);
 
       const letterData = {
-        title: (newLetter.title || '').trim(),
-        content: (newLetter.content || '').trim(),
-        letter_type_id: Number(newLetter.letter_type_id),
+        title: newLetter.title,
+        content: newLetter.content,
+        letter_type_id: newLetter.letter_type_id,
         fields: newLetter.fields || {},
         user_id: user?.id,
         status: 'draft'
@@ -143,70 +144,23 @@ export default function Letters() {
       console.error('Error creating letter:', err);
       console.error('Error details:', err.response?.data);
 
-      const message = (() => {
-        if (err.response?.status === 401) return 'Your session expired. Please log in again.';
-        if (err.response?.status === 403) return 'You do not have permission to create letters.';
-        if (err.response?.status === 422) {
-          const validationErrors = err.response.data?.errors;
-          if (validationErrors) {
-            return Object.entries(validationErrors)
-              .map(([field, messages]) => `${field}: ${messages.join(', ')}`)
-              .join('\n');
-          }
-          return err.response.data?.message || 'Validation failed';
+      if (err.response?.status === 422) {
+        const validationErrors = err.response.data?.errors;
+        if (validationErrors) {
+          const errorMessages = Object.entries(validationErrors)
+            .map(([field, messages]) => `${field}: ${messages.join(', ')}`)
+            .join('\n');
+          alert(`Validation failed:\n${errorMessages}`);
+        } else {
+          alert(err.response.data?.message || 'Validation failed');
         }
-        return err.response?.data?.message || err.message || 'Failed to create letter';
-      })();
-
-      alert(message);
-    }
-  };
-
-  const openPreview = (letter) => {
-    setPreviewLetter(letter);
-    setPreviewOpen(true);
-  };
-
-  const closePreview = () => {
-    setPreviewOpen(false);
-    setPreviewLetter(null);
-  };
-
-  const handleLetterEdit = (letter) => {
-    setEditingLetter(letter);
-    setEditMode(true);
-    setActiveTab('create');
-    setShowForm(true);
-    setSelectedType(letter.letter_type_id);
-  };
-
-  const handleLetterUpdate = async (updatedLetter) => {
-    try {
-      const response = await updateLetter(editingLetter.id, {
-        title: updatedLetter.title,
-        content: updatedLetter.content,
-        fields: updatedLetter.fields,
-        status: updatedLetter.status || editingLetter.status
-      });
-
-      if (response.data?.letter) {
-        setLetters(prev => prev.map(letter => 
-          letter.id === editingLetter.id ? response.data.letter : letter
-        ));
-        alert('Letter updated successfully!');
-        setEditMode(false);
-        setEditingLetter(null);
-        setShowForm(false);
-        setSelectedType('');
-        setActiveTab('view');
+      } else {
+        alert(`Failed to create letter: ${err.response?.data?.message || err.message}`);
       }
-    } catch (err) {
-      console.error('Error updating letter:', err);
-      alert(`Failed to update letter: ${err.response?.data?.message || err.message}`);
     }
   };
 
-  const handleLetterStatusUpdate = async (letterId, updates) => {
+  const handleLetterUpdate = async (letterId, updates) => {
     try {
       const response = await updateLetter(letterId, updates);
       const updatedLetter = response.data?.letter;
@@ -297,7 +251,6 @@ export default function Letters() {
 
   // --- Main Render ---
   return (
-    <>
     <div className="flex h-screen">
       <Sidebar role={user?.role || 'staff'} />
       <div className="flex-1 p-6 bg-gradient-to-br from-green-50 to-emerald-100 dark:from-gray-900 dark:to-gray-800 overflow-y-auto">
@@ -364,37 +317,10 @@ export default function Letters() {
                               <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(letter.status)}`}>{letter.status || 'Unknown'}</span>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
-                              <div><span className="font-medium">Type:</span> {letter.letterType?.name || 'Unknown'}</div>
-                              <div><span className="font-medium">To:</span> {
-                                (() => {
-                                  // Try to find the most appropriate recipient field based on letter type
-                                  const fields = letter.fields || {};
-                                  const typeName = letter.letterType?.name?.toLowerCase() || '';
-                                  
-                                  if (typeName.includes('meeting')) {
-                                    return fields.attendees || fields.target_audience || 'Team Members';
-                                  } else if (typeName.includes('job') || typeName.includes('application')) {
-                                    return fields.hiring_manager_name || fields.recipient_name || 'Hiring Manager';
-                                  } else if (typeName.includes('announcement') || typeName.includes('notice')) {
-                                    return fields.target_audience || fields.recipient_name || 'All Staff';
-                                  } else if (typeName.includes('confirmation') || typeName.includes('receipt')) {
-                                    return fields.recipient_name || fields.recipient_company || 'Recipient';
-                                  } else if (typeName.includes('professional') || typeName.includes('business')) {
-                                    return fields.recipient_name || fields.recipient_company || 'Client/Partner';
-                                  } else {
-                                    // Fallback to common recipient fields
-                                    return fields.recipient_name || 
-                                           fields.recipient || 
-                                           fields.to || 
-                                           fields.hiring_manager_name ||
-                                           fields.target_audience ||
-                                           'Not specified';
-                                  }
-                                })()
-                              }</div>
+                              <div><span className="font-medium">Type:</span> {letter.letter_type?.name || 'Unknown'}</div>
+                              <div><span className="font-medium">To:</span> {letter.fields?.recipient || letter.fields?.to || 'Not specified'}</div>
                               <div><span className="font-medium">Created:</span> {letter.created_at ? new Date(letter.created_at).toLocaleDateString() : 'Unknown date'}</div>
                             </div>
-
                             {user?.role === 'admin' && (
                               <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">
                                 <span className="font-medium">Created by:</span> {letter.user?.name || 'Unknown User'}
@@ -408,10 +334,10 @@ export default function Letters() {
                           </div>
 
                           <div className="flex flex-col space-y-2 ml-4">
-                            <button onClick={() => openPreview(letter)} className="px-3 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200">
+                            <button className="px-3 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200">
                               View
                             </button>
-                            <button onClick={() => handleLetterEdit(letter)} className="px-3 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded-full hover:bg-green-200 dark:hover:bg-green-800 transition-colors duration-200">
+                            <button className="px-3 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded-full hover:bg-green-200 dark:hover:bg-green-800 transition-colors duration-200">
                               Edit
                             </button>
                             {user?.role === 'admin' && (
@@ -474,19 +400,14 @@ export default function Letters() {
                     <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Letter Type</label>
                       <select value={selectedType} onChange={(e) => setSelectedType(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                        <option value="">Choose Your Letter Style</option>
+                        <option value="">Select Letter Type</option>
                         {letterTypes.map(type => <option key={type.id} value={type.id}>{type.name}</option>)}
                       </select>
                     </div>
 
                     {selectedType && (
                       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg p-6">
-                        <DynamicForm 
-                          typeId={selectedType} 
-                          onLetterCreated={editMode ? handleLetterUpdate : handleLetterCreated}
-                          editingLetter={editingLetter}
-                          editMode={editMode}
-                        />
+                        <DynamicForm typeId={selectedType} onLetterCreated={handleLetterCreated} />
                       </div>
                     )}
                   </div>
@@ -498,94 +419,5 @@ export default function Letters() {
         </div>
       </div>
     </div>
-
-    {previewOpen && previewLetter && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={closePreview}>
-        <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-[900px]" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Letter Preview</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">{previewLetter.letterType?.name || 'Letter'}</p>
-            </div>
-            <button onClick={closePreview} className="px-4 py-2 text-sm rounded-lg bg-red-100 dark:bg-red-700 text-red-700 dark:text-red-200 hover:bg-red-200 dark:hover:bg-red-600 font-medium">✕ Close</button>
-          </div>
-
-          <div className="p-4 overflow-auto">
-            <div
-              className="mx-auto bg-white text-gray-900 shadow print:shadow-none"
-              style={{ width: '794px', minHeight: '1123px', padding: '48px', boxSizing: 'border-box' }}
-            >
-              {/* Standard Business Letter Layout */}
-              <div className="space-y-6">
-                {/* Date - Top Left */}
-                <div className="text-sm text-gray-700">
-                  {(() => {
-                    const dateStr = previewLetter.created_at || new Date().toISOString();
-                    try { return new Date(dateStr).toLocaleDateString('en-US', { 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
-                    }); } catch { return new Date().toLocaleDateString(); }
-                  })()}
-                </div>
-
-                {/* Sender Company - Below Date */}
-                <div className="text-sm text-gray-700">
-                  {previewLetter.fields?.sender_company || previewLetter.fields?.company_name || 'Company Name'}
-                </div>
-
-                {/* Recipient Information - Left Aligned */}
-                <div className="text-sm text-gray-700 space-y-1">
-                  <div>{previewLetter.fields?.recipient_name || previewLetter.fields?.recipient || 'Recipient Name'}</div>
-                  {previewLetter.fields?.recipient_position && (
-                    <div>{previewLetter.fields.recipient_position}</div>
-                  )}
-                  {previewLetter.fields?.recipient_company && (
-                    <div>{previewLetter.fields.recipient_company}</div>
-                  )}
-                </div>
-
-                {/* Greeting */}
-                <div className="text-sm text-gray-700">
-                  Dear {previewLetter.fields?.recipient_name || previewLetter.fields?.recipient || 'Sir/Madam'},
-                </div>
-
-                {/* Subject Line */}
-                {previewLetter.fields?.subject && (
-                  <div className="text-sm text-gray-700">
-                    <span className="font-semibold">Subject:</span> {previewLetter.fields.subject}
-                  </div>
-                )}
-
-                {/* Letter Content */}
-                <div className="text-sm text-gray-700 leading-relaxed">
-                  <div className="whitespace-pre-wrap">
-                    {previewLetter.content || previewLetter.fields?.content || previewLetter.fields?.body || 'Letter content goes here...'}
-                  </div>
-                </div>
-
-                {/* Closing */}
-                <div className="text-sm text-gray-700 space-y-2">
-                  <div>Sincerely,</div>
-                  <div className="mt-8">
-                    {previewLetter.fields?.sender_name || 'Your Name'}
-                  </div>
-                  {previewLetter.fields?.sender_position && (
-                    <div>{previewLetter.fields.sender_position}</div>
-                  )}
-                  {previewLetter.fields?.contact_information && (
-                    <div className="text-xs text-gray-600 mt-2">
-                      {previewLetter.fields.contact_information}
-                    </div>
-                  )}
-                </div>
-
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )}
-    </>
   );
 }
