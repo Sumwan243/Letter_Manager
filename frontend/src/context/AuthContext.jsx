@@ -1,45 +1,60 @@
 import { createContext, useState, useEffect } from 'react';
 import { getCsrf, login as loginAPI, register as registerAPI, logout as logoutAPI, getCurrentUser } from '../api/auth';
+import axios from '../api/axios';
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    try {
+      const storedUser = localStorage.getItem('user');
+      return storedUser ? JSON.parse(storedUser) : null;
+    } catch (error) {
+      console.error('Failed to parse user from localStorage', error);
+      return null;
+    }
+  });
   const [loading, setLoading] = useState(true);
 
-  // Check if user is already logged in on app start
   useEffect(() => {
-    const checkAuthStatus = async () => {
-      try {
-        const response = await getCurrentUser();
-        setUser(response.data);
-      } catch (error) {
-        console.error('Auth check failed:', error);
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkAuthStatus();
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      // Verify token with backend
+      getCurrentUser()
+        .then(response => {
+          setUser(response.data);
+        })
+        .catch(error => {
+          if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+            // Invalid token, clear session
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('user');
+            setUser(null);
+            delete axios.defaults.headers.common['Authorization'];
+          }
+          // For other errors (e.g., network), we can choose to do nothing and keep the user logged in optimistically.
+          console.error('Token verification failed:', error);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   const login = async (email, password) => {
+    setLoading(true);
     try {
-      setLoading(true);
       await getCsrf();
       const response = await loginAPI({ email, password });
-      
       const { user: userData, token } = response.data;
-      
-      // Store token and user data
+
       localStorage.setItem('auth_token', token);
       localStorage.setItem('user', JSON.stringify(userData));
-      
-      // Set user in context
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setUser(userData);
-      
       return { success: true, user: userData };
     } catch (error) {
       console.error('Login failed:', error);
@@ -51,18 +66,15 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (userData) => {
+    setLoading(true);
     try {
-      setLoading(true);
       await getCsrf();
       const response = await registerAPI(userData);
-      
       const { user: newUser, token } = response.data;
       
-      // Store token and user data
       localStorage.setItem('auth_token', token);
       localStorage.setItem('user', JSON.stringify(newUser));
-      
-      // Set user in context
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       setUser(newUser);
       
       return { success: true, user: newUser };
@@ -77,15 +89,14 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      // Call logout API to invalidate token on backend
       await logoutAPI();
     } catch (error) {
       console.error('Logout API call failed:', error);
     } finally {
-      // Clear local storage and context regardless of API call result
       localStorage.removeItem('auth_token');
       localStorage.removeItem('user');
       setUser(null);
+      delete axios.defaults.headers.common['Authorization'];
     }
   };
 
@@ -94,17 +105,14 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('user', JSON.stringify(updatedUserData));
   };
 
-  // Check if user has specific role
   const hasRole = (role) => {
     return user?.role === role;
   };
 
-  // Check if user is admin
   const isAdmin = () => {
     return user?.role === 'admin';
   };
 
-  // Check if user is staff
   const isStaff = () => {
     return user?.role === 'staff';
   };
@@ -124,7 +132,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={value}>
-      {children}
+      {!loading && children}
     </AuthContext.Provider>
   );
 };

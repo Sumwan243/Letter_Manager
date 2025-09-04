@@ -25,8 +25,8 @@ export default function Letters() {
   if (letters && letters.length > 0) {
     console.log('First letter structure:', letters[0]);
     console.log('First letter keys:', Object.keys(letters[0]));
-    if (letters[0].letterType) {
-      console.log('LetterType structure:', letters[0].letterType);
+    if (letters[0].letter_type) {
+      console.log('LetterType structure:', letters[0].letter_type);
     }
     if (letters[0].user) {
       console.log('User structure:', letters[0].user);
@@ -318,7 +318,7 @@ export default function Letters() {
                               <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(letter.status)}`}>{letter.status || 'Unknown'}</span>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
-                              <div><span className="font-medium">Type:</span> {letter.letterType?.name || 'Unknown'}</div>
+                              <div><span className="font-medium">Type:</span> {letter.letter_type?.name || 'Unknown'}</div>
                               <div><span className="font-medium">To:</span> {letter.fields?.recipient || letter.fields?.to || 'Not specified'}</div>
                               <div><span className="font-medium">Created:</span> {letter.created_at ? new Date(letter.created_at).toLocaleDateString() : 'Unknown date'}</div>
                             </div>
