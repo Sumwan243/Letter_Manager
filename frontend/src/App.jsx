@@ -10,6 +10,7 @@ import Dashboard from './pages/Dashboard';
 import Letters from './pages/Letters';
 import CreateLetter from './pages/CreateLetter';
 import LetterTemplateForm from './pages/LetterTemplateForm';
+import Settings from './pages/Settings';
 import PrivateRoute from './components/PrivateRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -52,6 +53,17 @@ export default function App() {
                 <PrivateRoute roles={['admin', 'staff']}>
                   <ErrorBoundary>
                     <Letters />
+                  </ErrorBoundary>
+                </PrivateRoute>
+              }
+            />
+
+            <Route
+              path="/settings"
+              element={
+                <PrivateRoute roles={['admin', 'staff']}>
+                  <ErrorBoundary>
+                    <Settings />
                   </ErrorBoundary>
                 </PrivateRoute>
               }

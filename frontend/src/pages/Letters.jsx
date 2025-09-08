@@ -20,6 +20,12 @@ export default function Letters() {
   const [viewingLetter, setViewingLetter] = useState(null);
   const [editingLetter, setEditingLetter] = useState(null);
   const [editMode, setEditMode] = useState(false);
+  const [previewFontFamily, setPreviewFontFamily] = useState('sans');
+  const [previewFontSize, setPreviewFontSize] = useState(14);
+  const [sendModalOpen, setSendModalOpen] = useState(false);
+  const [sendTargetLetter, setSendTargetLetter] = useState(null);
+  const [sendToEmail, setSendToEmail] = useState('');
+  const [sending, setSending] = useState(false);
 
   // Debug logging
   console.log('Rendering Letters with:', { user, loading, error, letters });
@@ -230,6 +236,39 @@ export default function Letters() {
     }
   };
 
+  const openSendModal = (letter) => {
+    setSendTargetLetter(letter);
+    setSendToEmail('');
+    setSendModalOpen(true);
+  };
+
+  const closeSendModal = () => {
+    setSendModalOpen(false);
+    setSendTargetLetter(null);
+    setSendToEmail('');
+  };
+
+  const handleSendSubmit = async () => {
+    const email = (sendToEmail || '').trim();
+    const emailValid = /.+@.+\..+/.test(email);
+    if (!emailValid) {
+      alert('Please enter a valid recipient email address.');
+      return;
+    }
+    if (!sendTargetLetter) return;
+    try {
+      setSending(true);
+      await handleStatusChange(sendTargetLetter.id, 'sent');
+      alert(`Letter queued to be sent to ${email}.`);
+      closeSendModal();
+    } catch (e) {
+      console.error(e);
+      alert('Failed to send.');
+    } finally {
+      setSending(false);
+    }
+  };
+
   // Recipient resolver for list view based on new layouts
   const getListRecipient = (letter) => {
     const fields = letter?.fields || {};
@@ -259,6 +298,29 @@ export default function Letters() {
   const filteredLetters = user?.role === 'admin'
     ? lettersArray
     : lettersArray.filter(letter => letter.user_id === user?.id || letter.created_by === user?.id);
+
+  // Split into Drafts and Sent
+  const draftLetters = filteredLetters.filter(l => (l.status || '').toLowerCase() === 'draft');
+  const sentLetters = filteredLetters.filter(l => (l.status || '').toLowerCase() === 'sent');
+
+  // Persist preview font settings per letter id
+  useEffect(() => {
+    if (!viewingLetter?.id) return;
+    const saved = localStorage.getItem(`letterPreview:${viewingLetter.id}`);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.fontFamily) setPreviewFontFamily(parsed.fontFamily);
+        if (parsed.fontSize) setPreviewFontSize(parsed.fontSize);
+      } catch {}
+    }
+  }, [viewingLetter?.id]);
+
+  useEffect(() => {
+    if (!viewingLetter?.id) return;
+    const payload = JSON.stringify({ fontFamily: previewFontFamily, fontSize: previewFontSize });
+    localStorage.setItem(`letterPreview:${viewingLetter.id}`, payload);
+  }, [previewFontFamily, previewFontSize, viewingLetter?.id]);
 
   // --- Render Error State ---
   if (error) {
@@ -296,7 +358,7 @@ export default function Letters() {
   return (
     <div className="flex h-screen">
       <Sidebar role={user?.role || 'staff'} />
-      <div className="flex-1 p-6 bg-gradient-to-br from-green-50 to-emerald-100 dark:from-gray-900 dark:to-gray-800 overflow-y-auto">
+      <div className="flex-1 p-6 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-gray-900 dark:to-gray-800 overflow-y-auto">
         {/* Header */}
         <div className="mb-8">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-100 dark:border-gray-700">
@@ -313,7 +375,7 @@ export default function Letters() {
             <nav className="flex space-x-8 px-6">
               {[{ id: 'view', name: user?.role === 'admin' ? 'All Letters' : 'My Letters', icon: '📋' },
                 { id: 'create', name: 'Create Letter', icon: '✏️' }].map(tab => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id ? 'border-green-500 text-green-600 dark:text-green-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'}`}>
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id ? 'border-blue-600 text-blue-700 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'}`}>
                   <span className="mr-2">{tab.icon}</span>{tab.name}
                 </button>
               ))}
@@ -332,8 +394,8 @@ export default function Letters() {
                       {refreshing ? 'Refreshing...' : 'Refresh'}
                     </button>
                     <button
-                      onClick={() => setActiveTab('create')}
-                      className="px-3 py-1 text-sm bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded-lg hover:bg-green-200 dark:hover:bg-green-800 transition-colors duration-200"
+                      onClick={() => { setEditMode(false); setEditingLetter(null); setSelectedType(''); setActiveTab('create'); }}
+                      className="px-3 py-1 text-sm bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200"
                     >
                       + New Letter
                     </button>
@@ -347,52 +409,88 @@ export default function Letters() {
                 ) : filteredLetters.length === 0 ? (
                   <div className="text-center py-8">
                     <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No letters found</h3>
-                    <button onClick={() => setActiveTab('create')} className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Create Your First Letter</button>
+                    <button onClick={() => setActiveTab('create')} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Create Your First Letter</button>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    {filteredLetters.map(letter => (
-                      <div key={letter.id} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-3 mb-2">
-                              <h4 className="text-lg font-medium text-gray-900 dark:text-white">{letter.title || letter.fields?.subject || 'Untitled Letter'}</h4>
-                              {/* Hide status badge for a cleaner list; can re-enable when send/receive is added */}
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
-                              <div><span className="font-medium">Type:</span> {letter.letter_type?.name || 'Unknown'}</div>
-                              <div><span className="font-medium">To:</span> {getListRecipient(letter)}</div>
-                              <div><span className="font-medium">Created:</span> {letter.created_at ? new Date(letter.created_at).toLocaleDateString() : 'Unknown date'}</div>
-                            </div>
-                            {user?.role === 'admin' && (
-                              <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                                <span className="font-medium">Created by:</span> {letter.user?.name || 'Unknown User'}
-                              </div>
-                            )}
-                            <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
-                              <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-3">
-                                {letter.content || letter.fields?.content || letter.fields?.body || 'No content available'}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col space-y-2 ml-4">
-                            <button onClick={() => handleLetterView(letter)} className="px-3 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200">
-                              View
-                            </button>
-                            <button onClick={() => handleLetterEdit(letter)} className="px-3 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded-full hover:bg-green-200 dark:hover:bg-green-800 transition-colors duration-200">
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => handleLetterDelete(letter.id)}
-                              className="px-3 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded-full hover:bg-red-200 dark:hover:bg-red-800 transition-colors duration-200"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
+                  <div className="space-y-8">
+                    {/* Drafts */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Drafts</h4>
+                        <span className="text-xs text-gray-500">{draftLetters.length}</span>
                       </div>
-                    ))}
+                      <div className="space-y-4">
+                        {draftLetters.length === 0 && (
+                          <div className="text-sm text-gray-500">No drafts</div>
+                        )}
+                        {draftLetters.map(letter => (
+                          <div key={letter.id} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-3 mb-2">
+                                  <h4 className="text-lg font-medium text-gray-900 dark:text-white">{letter.title || letter.fields?.subject || 'Untitled Letter'}</h4>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
+                                  <div><span className="font-medium">Type:</span> {letter.letter_type?.name || 'Unknown'}</div>
+                                  <div><span className="font-medium">To:</span> {getListRecipient(letter)}</div>
+                                  <div><span className="font-medium">Created:</span> {letter.created_at ? new Date(letter.created_at).toLocaleDateString() : 'Unknown date'}</div>
+                                </div>
+                                <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
+                                  <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-3">
+                                    {letter.content || letter.fields?.content || letter.fields?.body || 'No content available'}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex flex-col space-y-2 ml-4">
+                                <button onClick={() => handleLetterView(letter)} className="px-3 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200">View</button>
+                                <button onClick={() => handleLetterEdit(letter)} className="px-3 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200">Edit</button>
+                                <button onClick={() => openSendModal(letter)} className="px-3 py-1 text-xs bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors duration-200">Send</button>
+                                <button onClick={() => handleLetterDelete(letter.id)} className="px-3 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded-full hover:bg-red-200 dark:hover:bg-red-800 transition-colors duration-200">Delete</button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Sent */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Sent</h4>
+                        <span className="text-xs text-gray-500">{sentLetters.length}</span>
+                      </div>
+                      <div className="space-y-4">
+                        {sentLetters.length === 0 && (
+                          <div className="text-sm text-gray-500">No sent letters</div>
+                        )}
+                        {sentLetters.map(letter => (
+                          <div key={letter.id} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-3 mb-2">
+                                  <h4 className="text-lg font-medium text-gray-900 dark:text-white">{letter.title || letter.fields?.subject || 'Untitled Letter'}</h4>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
+                                  <div><span className="font-medium">Type:</span> {letter.letter_type?.name || 'Unknown'}</div>
+                                  <div><span className="font-medium">To:</span> {getListRecipient(letter)}</div>
+                                  <div><span className="font-medium">Sent:</span> {letter.updated_at ? new Date(letter.updated_at).toLocaleDateString() : (letter.created_at ? new Date(letter.created_at).toLocaleDateString() : 'Unknown date')}</div>
+                                </div>
+                                <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-600">
+                                  <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-3">
+                                    {letter.content || letter.fields?.content || letter.fields?.body || 'No content available'}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex flex-col space-y-2 ml-4">
+                                <button onClick={() => handleLetterView(letter)} className="px-3 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200">View</button>
+                                <button onClick={() => handleLetterEdit(letter)} className="px-3 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200">Edit</button>
+                                <button onClick={() => handleLetterDelete(letter.id)} className="px-3 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded-full hover:bg-red-200 dark:hover:bg-red-800 transition-colors duration-200">Delete</button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -404,7 +502,7 @@ export default function Letters() {
                 <div className="flex justify-between items-center">
                   <div className="flex items-center space-x-3">
                     <button
-                      onClick={() => setActiveTab('view')}
+                      onClick={() => { setActiveTab('view'); setEditMode(false); setEditingLetter(null); setSelectedType(''); }}
                       className="px-3 py-1 text-sm bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200"
                     >
                       ← Back to Letters
@@ -418,7 +516,7 @@ export default function Letters() {
                     <div className="relative">
                       <select
                         value={selectedType}
-                        onChange={(e) => setSelectedType(e.target.value)}
+                        onChange={(e) => { if (editMode) { setEditMode(false); setEditingLetter(null); } setSelectedType(e.target.value); }}
                         className="appearance-none w-full px-4 py-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent"
                       >
                         <option value="" disabled hidden>
@@ -460,29 +558,50 @@ export default function Letters() {
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                 {viewingLetter.title || 'Letter View'}
               </h2>
-              <button
-                onClick={closeLetterView}
-                className="px-4 py-2 text-sm rounded-lg bg-red-100 dark:bg-red-700 text-red-700 dark:text-red-200 hover:bg-red-200 dark:hover:bg-red-600 font-medium"
-              >
-                ✕ Close
-              </button>
+              <div className="flex items-center gap-3">
+                {/* Font controls */}
+                <select value={previewFontFamily} onChange={(e) => setPreviewFontFamily(e.target.value)} className="text-sm px-2 py-1 border border-gray-300 rounded-md">
+                  <option value="sans">Sans</option>
+                  <option value="serif">Serif</option>
+                  <option value="mono">Mono</option>
+                </select>
+                <input type="range" min={12} max={20} value={previewFontSize} onChange={(e) => setPreviewFontSize(Number(e.target.value))} className="w-24" />
+                <button
+                  onClick={() => {
+                    if (!viewingLetter?.id) return;
+                    const payload = JSON.stringify({ fontFamily: previewFontFamily, fontSize: previewFontSize });
+                    localStorage.setItem(`letterPreview:${viewingLetter.id}`, payload);
+                    alert('Preview settings saved');
+                  }}
+                  className="px-3 py-1 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={closeLetterView}
+                  className="px-4 py-2 text-sm rounded-lg bg-red-100 dark:bg-red-700 text-red-700 dark:text-red-200 hover:bg-red-200 dark:hover:bg-red-600 font-medium"
+                >
+                  ✕ Close
+                </button>
+              </div>
             </div>
             
             <div className="p-8 bg-gray-50 dark:bg-gray-800/50 overflow-auto" style={{ maxHeight: 'calc(90vh - 120px)' }}>
               {/* A4 Paper Layout */}
               <div 
-                className="mx-auto bg-white text-gray-900 shadow-lg print:shadow-none"
+                className={`mx-auto bg-white text-gray-900 shadow-lg print:shadow-none ${previewFontFamily === 'serif' ? 'font-serif' : previewFontFamily === 'mono' ? 'font-mono' : 'font-sans'}`}
                 style={{ 
                   width: '210mm', 
                   minHeight: '297mm', 
                   padding: '20mm',
                   boxSizing: 'border-box',
-                  backgroundColor: 'white'
+                  backgroundColor: 'white',
+                  fontSize: `${previewFontSize}px`
                 }}
               >
 
                 {/* Letter Layout */}
-                <div className={`space-y-6 ${getLetterLayout(viewingLetter.letter_type) === 'memo' ? 'font-mono' : getLetterLayout(viewingLetter.letter_type) === 'cover-letter' ? 'font-serif' : 'font-sans'}`}>
+                <div className={`space-y-6`}>
                   {(() => {
                     const typeName = viewingLetter.letter_type?.name?.toLowerCase() || '';
                     const fields = viewingLetter.fields || {};
@@ -492,20 +611,25 @@ export default function Letters() {
                       // Formal – Executive Layout
                       return (
                         <>
-                          {/* Header with optional logo on the left and date on the right */}
+                          {/* Header with optional logo and name on the left; address below; date on the right */}
                           <div className="flex justify-between items-start mb-8">
-                            <div className="flex items-start space-x-4 flex-1">
-                              {fields.company_logo && (
-                                <img
-                                  src={fields.company_logo}
-                                  alt="Company Logo"
-                                  className="h-16 w-auto object-contain"
-                                />
-                              )}
-                              <div>
-                                <h2 className="text-xl font-bold text-gray-900 mb-1">
-                                  {fields.company_name || fields.sender_company || ''}
-                                </h2>
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-4">
+                                {fields.company_logo && (
+                                  <img
+                                    src={fields.company_logo}
+                                    alt="Company Logo"
+                                    className="h-16 w-auto object-contain"
+                                  />
+                                )}
+                                {(fields.company_name || fields.sender_company) && (
+                                  <h2 className="text-xl font-bold text-gray-900">
+                                    {fields.company_name || fields.sender_company}
+                                  </h2>
+                                )}
+                              </div>
+                              {/* Address below the logo/name to avoid cramping */}
+                              <div className="mt-2">
                                 {fields.address_line1 && (
                                   <p className="text-sm text-gray-600">{fields.address_line1}</p>
                                 )}
@@ -754,6 +878,29 @@ export default function Letters() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send Modal */}
+      {sendModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Send Letter</h3>
+            <label htmlFor="sendToEmail" className="block text-sm text-gray-700 dark:text-gray-300 mb-1">Recipient Email</label>
+            <input
+              id="sendToEmail"
+              name="sendToEmail"
+              type="email"
+              value={sendToEmail}
+              onChange={(e) => setSendToEmail(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="recipient@example.com"
+            />
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={closeSendModal} className="px-4 py-2 text-sm rounded-md bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600">Cancel</button>
+              <button onClick={handleSendSubmit} disabled={sending} className="px-4 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60">{sending ? 'Sending…' : 'Send'}</button>
             </div>
           </div>
         </div>

@@ -171,7 +171,7 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
       value: formData[field.name] || '',
       onChange: (e) => handleChange(e, field.name),
       required: false,
-      className: "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent"
+      className: "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
     };
 
     switch (fieldType) {
@@ -235,34 +235,18 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
               onChange={(e) => {
                 const file = e.target.files[0];
                 if (file) {
-                  console.log('File selected:', file.name, 'Size:', file.size, 'Type:', file.type);
-                  
-                  // Check file size (limit to 5MB)
-                  if (file.size > 5 * 1024 * 1024) {
-                    alert('File too large. Please select an image smaller than 5MB.');
-                    return;
-                  }
-                  
+                  if (file.size > 5 * 1024 * 1024) { alert('Image too large (max 5MB).'); return; }
                   const reader = new FileReader();
-                  reader.onload = (e) => {
-                    console.log('File converted to base64, length:', e.target.result.length);
-                    handleChange({ target: { value: e.target.result } }, field.name);
-                  };
-                  reader.onerror = (error) => {
-                    console.error('Error reading file:', error);
-                    alert('Error reading file. Please try again.');
-                  };
+                  reader.onload = (e) => handleChange({ target: { value: e.target.result } }, field.name);
+                  reader.onerror = () => alert('Error reading file.');
                   reader.readAsDataURL(file);
                 }
               }}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="hidden"
             />
+            <label htmlFor={field.name} className="inline-flex items-center px-3 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 cursor-pointer">{formData[field.name] ? 'Change File' : 'Upload File'}</label>
             {formData[field.name] && (
-              <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg">
-                <p className="text-sm text-green-700 dark:text-green-300">
-                  ✓ Logo uploaded successfully
-                </p>
-              </div>
+              <span className="ml-3 text-xs text-gray-600 dark:text-gray-300 align-middle">Selected</span>
             )}
           </div>
         );
@@ -343,7 +327,7 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
         </button>
         <button
           type="submit"
-          className="px-6 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors duration-200"
+          className="px-6 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200"
         >
           {editMode ? 'Update Letter' : 'Create Letter'}
         </button>
