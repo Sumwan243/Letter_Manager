@@ -6,10 +6,7 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
   const [formData, setFormData] = useState({});
   const [loading, setLoading] = useState(true);
   const [letterType, setLetterType] = useState(null);
-  const [letterData, setLetterData] = useState({
-    title: '',
-    content: ''
-  });
+
 
   useEffect(() => {
     const loadLetterType = async () => {
@@ -74,10 +71,14 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
 
           // Set existing letter data if editing
           if (editMode && editingLetter) {
-            setLetterData({
-              title: editingLetter.title || '',
-              content: editingLetter.content || ''
+            // Populate form fields with editing letter data
+            const editingData = {};
+            transformedFields.forEach(field => {
+              if (editingLetter.fields?.[field.name]) {
+                editingData[field.name] = editingLetter.fields[field.name];
+              }
             });
+            setFormData(editingData);
           }
         } else {
           console.error('Letter type not found:', typeId);
@@ -103,13 +104,31 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // No validation - user can input anything they want
+    // Find the main content field from the template
+    const contentFields = ['body', 'notice_content', 'letter_content', 'meeting_objectives', 'impact_description', 'personal_message'];
+    let mainContent = '';
+    let title = '';
 
-    // No required field validation - user can input anything they want
+    // Look for content in template-specific fields
+    for (const fieldName of contentFields) {
+      if (formData[fieldName]) {
+        mainContent = formData[fieldName];
+        break;
+      }
+    }
+
+    // Look for title in template-specific fields
+    const titleFields = ['notice_title', 'meeting_title', 'letter_purpose', 'job_title'];
+    for (const fieldName of titleFields) {
+      if (formData[fieldName]) {
+        title = formData[fieldName];
+        break;
+      }
+    }
 
     console.log('DynamicForm submitting with data:', {
-      title: letterData.title,
-      content: letterData.content,
+      title: title,
+      content: mainContent,
       letter_type_id: typeId,
       fields: formData
     });
@@ -126,8 +145,8 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
     // Call the callback with the complete form data
     if (onLetterCreated) {
       onLetterCreated({
-        title: letterData.title,
-        content: letterData.content,
+        title: title,
+        content: mainContent,
         letter_type_id: typeId,
         fields: formData
       });
@@ -290,62 +309,24 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
         </p>
       </div>
 
-      {/* Basic Letter Information */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="md:col-span-2">
-          <label htmlFor="letter-title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Title <span className="text-red-500">*</span>
-          </label>
-          <input
-            id="letter-title"
-            name="title"
-            type="text"
-            value={letterData.title}
-            onChange={(e) => setLetterData(prev => ({ ...prev, title: e.target.value }))}
-            placeholder="Enter letter title..."
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent"
-          />
-        </div>
-
-        <div className="md:col-span-2">
-          <label htmlFor="letter-content" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Content <span className="text-red-500">*</span>
-          </label>
-          <textarea
-            id="letter-content"
-            name="content"
-            value={letterData.content}
-            onChange={(e) => setLetterData(prev => ({ ...prev, content: e.target.value }))}
-            placeholder="Write your letter content here..."
-            rows={8}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
-          />
-        </div>
-      </div>
-
       {/* Letter Fields */}
       {fields.length > 0 && (
-        <div className="border-t border-gray-200 dark:border-gray-600 pt-6 mt-6">
-          <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">
-            Letter Information
-          </h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {fields.map((field, index) => (
-              <div key={field.id || `${field.name}-${index}` } className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
-                <label htmlFor={field.name} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {getFieldLabel(field.name)}
-                </label>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {fields.map((field, index) => (
+            <div key={field.id || `${field.name}-${index}` } className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
+              <label htmlFor={field.name} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {getFieldLabel(field.name)}
+              </label>
 
-                {renderField(field)}
+              {renderField(field)}
 
-                {field.description && (
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    {field.description}
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
+              {field.description && (
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {field.description}
+                </p>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
@@ -354,7 +335,6 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
           type="button"
           onClick={() => {
             setFormData({});
-            setLetterData({ title: '', content: '' });
             if (onLetterCreated) onLetterCreated(null);
           }}
           className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200"

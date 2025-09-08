@@ -452,69 +452,322 @@ export default function Letters() {
                   backgroundColor: 'white'
                 }}
               >
-                {/* Letter Header */}
-                <div className="flex justify-between items-start mb-8">
-                  <div>
-                    <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                      {viewingLetter.title || 'Letter Title'}
-                    </h1>
-                    <p className="text-sm text-gray-600">
-                      Type: <span className="font-medium">{viewingLetter.letter_type?.name || 'Unknown'}</span>
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">{viewingLetter.user?.name || 'Unknown User'}</p>
-                  </div>
-                </div>
-
-                <hr className="border-gray-300 mb-6" />
 
                 {/* Letter Layout */}
                 <div className={`space-y-6 ${getLetterLayout(viewingLetter.letter_type) === 'memo' ? 'font-mono' : getLetterLayout(viewingLetter.letter_type) === 'cover-letter' ? 'font-serif' : 'font-sans'}`}>
-                  {/* Company Logo & Header */}
-                  <div className={`flex justify-between items-start ${getLetterLayout(viewingLetter.letter_type) === 'memo' ? 'border-b-2 border-black pb-4 mb-8' : getLetterLayout(viewingLetter.letter_type) === 'announcement' ? 'bg-gray-50 p-4 rounded-lg mb-8' : 'mb-8'}`}>
-                    <div className="flex-1">
-                      {/* Company Logo */}
-                      {viewingLetter.fields?.company_logo && (
-                        <div className="mb-6">
-                          <img 
-                            src={viewingLetter.fields.company_logo} 
-                            alt="Company Logo" 
-                            className="h-32 w-auto object-contain max-w-xs"
-                          />
+                  {(() => {
+                    const typeName = viewingLetter.letter_type?.name?.toLowerCase() || '';
+                    const fields = viewingLetter.fields || {};
+                    
+                    // Different layouts based on letter type
+                    if (typeName.includes('professional') || typeName.includes('business')) {
+                      // Business Letter Layout
+                      return (
+                        <>
+                          {/* Company Logo - Centered */}
+                          {fields.company_logo && (
+                            <div className="text-center mb-8">
+                              <img 
+                                src={fields.company_logo} 
+                                alt="Company Logo" 
+                                className="h-32 w-auto object-contain mx-auto"
+                              />
+                            </div>
+                          )}
+
+                          {/* Company Header with Date */}
+                          <div className="flex justify-between items-start mb-8">
+                            <div className="flex-1">
+                              <h2 className="text-xl font-bold text-gray-900 mb-1">
+                                {fields.company_name || fields.sender_company || 'Company Name'}
+                              </h2>
+                              {fields.address_line1 && (
+                                <p className="text-sm text-gray-600">{fields.address_line1}</p>
+                              )}
+                              {fields.address_line2 && (
+                                <p className="text-sm text-gray-600">{fields.address_line2}</p>
+                              )}
+                              {fields.city && fields.state && (
+                                <p className="text-sm text-gray-600">
+                                  {fields.city}, {fields.state} {fields.zip_code}
+                                </p>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm text-gray-600">
+                                {viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', { 
+                                  year: 'numeric', 
+                                  month: 'long', 
+                                  day: 'numeric' 
+                                }) : 'Date'}
+                              </p>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    } else if (typeName.includes('job') || typeName.includes('application')) {
+                      // Cover Letter Layout
+                      return (
+                        <>
+                          {/* Applicant Header */}
+                          <div className="mb-8">
+                            <h2 className="text-xl font-bold text-gray-900 mb-2">
+                              {fields.applicant_name || 'Your Name'}
+                            </h2>
+                            {fields.applicant_address && (
+                              <p className="text-sm text-gray-600 whitespace-pre-line">{fields.applicant_address}</p>
+                            )}
+                            <div className="mt-2 text-sm text-gray-600">
+                              {fields.applicant_phone && <span>Phone: {fields.applicant_phone}</span>}
+                              {fields.applicant_email && <span className="ml-4">Email: {fields.applicant_email}</span>}
+                            </div>
+                          </div>
+
+                          {/* Application Date */}
+                          <div className="mb-6 text-right">
+                            <p className="text-sm text-gray-600">
+                              {fields.application_date || (viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', { 
+                                year: 'numeric', 
+                                month: 'long', 
+                                day: 'numeric' 
+                              }) : 'Date')}
+                            </p>
+                          </div>
+                        </>
+                      );
+                    } else if (typeName.includes('announcement') || typeName.includes('notice')) {
+                      // Official Notice Layout
+                      return (
+                        <>
+                          {/* Notice Header */}
+                          <div className="text-center mb-8 border-b-2 border-gray-300 pb-4">
+                            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                              {fields.notice_title || 'OFFICIAL NOTICE'}
+                            </h2>
+                            {fields.notice_number && (
+                              <p className="text-sm text-gray-600">Notice No: {fields.notice_number}</p>
+                            )}
+                          </div>
+
+                          {/* Notice Info */}
+                          <div className="mb-6">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="text-sm font-semibold text-gray-900">
+                                  From: {fields.sender_name || fields.issuing_authority || 'Authority'}
+                                </p>
+                                {fields.sender_position && (
+                                  <p className="text-sm text-gray-600">{fields.sender_position}</p>
+                                )}
+                                {fields.sender_department && (
+                                  <p className="text-sm text-gray-600">{fields.sender_department}</p>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm text-gray-600">
+                                  Date: {fields.effective_date || fields.publication_date || (viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', { 
+                                    year: 'numeric', 
+                                    month: 'long', 
+                                    day: 'numeric' 
+                                  }) : 'Date')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    } else if (typeName.includes('meeting')) {
+                      // Memo Layout
+                      return (
+                        <>
+                          {/* Memo Header */}
+                          <div className="border-b-2 border-black pb-4 mb-8">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h2 className="text-xl font-bold text-gray-900 mb-1">MEMORANDUM</h2>
+                                <p className="text-sm text-gray-600">To: {fields.attendees || 'Team Members'}</p>
+                                <p className="text-sm text-gray-600">From: {fields.organizer_name || 'Organizer'}</p>
+                                {fields.organizer_position && (
+                                  <p className="text-sm text-gray-600">{fields.organizer_position}</p>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm text-gray-600">
+                                  Date: {fields.meeting_date || (viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', { 
+                                    year: 'numeric', 
+                                    month: 'long', 
+                                    day: 'numeric' 
+                                  }) : 'Date')}
+                                </p>
+                                {fields.meeting_time && (
+                                  <p className="text-sm text-gray-600">Time: {fields.meeting_time}</p>
+                                )}
+                                {fields.meeting_location && (
+                                  <p className="text-sm text-gray-600">Location: {fields.meeting_location}</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    } else if (typeName.includes('confidential') || typeName.includes('private')) {
+                      // Personal Letter Layout
+                      return (
+                        <>
+                          {/* Personal Letter Header */}
+                          <div className="mb-8">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h2 className="text-xl font-bold text-gray-900 mb-1">
+                                  {fields.company_name || fields.sender_company || fields.sender_name || 'Your Name'}
+                                </h2>
+                                {fields.sender_address && (
+                                  <p className="text-sm text-gray-600 whitespace-pre-line">{fields.sender_address}</p>
+                                )}
+                                {fields.address_line1 && (
+                                  <p className="text-sm text-gray-600">{fields.address_line1}</p>
+                                )}
+                                {fields.address_line2 && (
+                                  <p className="text-sm text-gray-600">{fields.address_line2}</p>
+                                )}
+                                {fields.city && fields.state && (
+                                  <p className="text-sm text-gray-600">
+                                    {fields.city}, {fields.state} {fields.zip_code}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm text-gray-600">
+                                  {fields.letter_date || (viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', { 
+                                    year: 'numeric', 
+                                    month: 'long', 
+                                    day: 'numeric' 
+                                  }) : 'Date')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    } else if (typeName.includes('confirmation') || typeName.includes('receipt')) {
+                      // Receipt/Confirmation Layout
+                      return (
+                        <>
+                          {/* Receipt Header */}
+                          <div className="text-center mb-8 border-b border-gray-300 pb-4">
+                            <h2 className="text-xl font-bold text-gray-900 mb-2">CONFIRMATION RECEIPT</h2>
+                            {fields.receipt_number && (
+                              <p className="text-sm text-gray-600">Receipt No: {fields.receipt_number}</p>
+                            )}
+                          </div>
+
+                          {/* Receipt Info */}
+                          <div className="mb-6">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="text-sm font-semibold text-gray-900">
+                                  From: {fields.sender_name || 'Sender'}
+                                </p>
+                                {fields.sender_company && (
+                                  <p className="text-sm text-gray-600">{fields.sender_company}</p>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm text-gray-600">
+                                  Date: {fields.receipt_date || fields.received_date || (viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', { 
+                                    year: 'numeric', 
+                                    month: 'long', 
+                                    day: 'numeric' 
+                                  }) : 'Date')}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    } else {
+                      // Default Business Letter Layout
+                      return (
+                        <>
+                          {/* Company Logo - Centered */}
+                          {fields.company_logo && (
+                            <div className="text-center mb-8">
+                              <img 
+                                src={fields.company_logo} 
+                                alt="Company Logo" 
+                                className="h-32 w-auto object-contain mx-auto"
+                              />
+                            </div>
+                          )}
+
+                          {/* Company Header with Date */}
+                          <div className="flex justify-between items-start mb-8">
+                            <div className="flex-1">
+                              <h2 className="text-xl font-bold text-gray-900 mb-1">
+                                {fields.company_name || fields.sender_company || 'Company Name'}
+                              </h2>
+                              {fields.address_line1 && (
+                                <p className="text-sm text-gray-600">{fields.address_line1}</p>
+                              )}
+                              {fields.address_line2 && (
+                                <p className="text-sm text-gray-600">{fields.address_line2}</p>
+                              )}
+                              {fields.city && fields.state && (
+                                <p className="text-sm text-gray-600">
+                                  {fields.city}, {fields.state} {fields.zip_code}
+                                </p>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm text-gray-600">
+                                {viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', { 
+                                  year: 'numeric', 
+                                  month: 'long', 
+                                  day: 'numeric' 
+                                }) : 'Date'}
+                              </p>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    }
+                  })()}
+
+                  {/* Letter Title */}
+                  {(() => {
+                    const fields = viewingLetter.fields || {};
+                    const titleFields = ['notice_title', 'meeting_title', 'letter_purpose', 'job_title'];
+                    
+                    // Look for title in template-specific fields
+                    for (const fieldName of titleFields) {
+                      if (fields[fieldName]) {
+                        return (
+                          <div className="mt-6 mb-4">
+                            <h2 className="text-lg font-semibold text-gray-900 text-center">
+                              {fields[fieldName]}
+                            </h2>
+                          </div>
+                        );
+                      }
+                    }
+                    
+                    // Fallback to main title field
+                    if (viewingLetter.title) {
+                      return (
+                        <div className="mt-6 mb-4">
+                          <h2 className="text-lg font-semibold text-gray-900 text-center">
+                            {viewingLetter.title}
+                          </h2>
                         </div>
-                      )}
-                      {/* Company Name */}
-                      <h2 className="text-xl font-bold text-gray-900 mb-1">
-                        {viewingLetter.fields?.company_name || viewingLetter.fields?.sender_company || 'Company Name'}
-                      </h2>
-                      {/* Company Address */}
-                      {viewingLetter.fields?.address_line1 && (
-                        <p className="text-sm text-gray-600">{viewingLetter.fields.address_line1}</p>
-                      )}
-                      {viewingLetter.fields?.address_line2 && (
-                        <p className="text-sm text-gray-600">{viewingLetter.fields.address_line2}</p>
-                      )}
-                      {viewingLetter.fields?.city && viewingLetter.fields?.state && (
-                        <p className="text-sm text-gray-600">
-                          {viewingLetter.fields.city}, {viewingLetter.fields.state} {viewingLetter.fields?.zip_code}
-                        </p>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-gray-600">
-                        {viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', { 
-                          year: 'numeric', 
-                          month: 'long', 
-                          day: 'numeric' 
-                        }) : 'Date'}
-                      </p>
-                    </div>
-                  </div>
+                      );
+                    }
+                    
+                    return null;
+                  })()}
 
                   {/* Recipient Address */}
-                  <div className="mt-8">
-                    <div className="text-sm text-gray-700">
+                  <div className="mt-8 mb-6">
+                    <div className="text-sm text-gray-700 font-medium">
                       {(() => {
                         const fields = viewingLetter.fields || {};
                         const typeName = viewingLetter.letter_type?.name?.toLowerCase() || '';
@@ -529,6 +782,8 @@ export default function Letters() {
                           return fields.recipient_name || fields.recipient_company || 'Recipient';
                         } else if (typeName.includes('professional') || typeName.includes('business')) {
                           return fields.recipient_name || fields.recipient_company || 'Client/Partner';
+                        } else if (typeName.includes('confidential') || typeName.includes('private')) {
+                          return fields.recipient_name || 'Recipient';
                         } else {
                           return fields.recipient_name || fields.recipient || fields.to || 'Not specified';
                         }
@@ -541,12 +796,12 @@ export default function Letters() {
                       <div className="text-sm text-gray-700">{viewingLetter.fields.recipient_company}</div>
                     )}
                     {viewingLetter.fields?.recipient_address && (
-                      <div className="text-sm text-gray-700">{viewingLetter.fields.recipient_address}</div>
+                      <div className="text-sm text-gray-700 whitespace-pre-line">{viewingLetter.fields.recipient_address}</div>
                     )}
                   </div>
 
                   {/* Salutation */}
-                  <div className="mt-6">
+                  <div className="mb-4">
                     <p className="text-sm text-gray-700">
                       Dear {viewingLetter.fields?.recipient_name || viewingLetter.fields?.recipient || 'Sir/Madam'},
                     </p>
@@ -554,7 +809,7 @@ export default function Letters() {
 
                   {/* Subject Line */}
                   {viewingLetter.fields?.subject && (
-                    <div className="mt-4">
+                    <div className="mt-4 mb-4">
                       <p className="text-sm font-semibold text-gray-900">
                         Subject: {viewingLetter.fields.subject}
                       </p>
@@ -565,7 +820,20 @@ export default function Letters() {
                   <div className="mt-4">
                     <div className="text-sm text-gray-700 leading-relaxed">
                       <p className="whitespace-pre-wrap">
-                        {viewingLetter.content || 'No content available'}
+                        {(() => {
+                          const fields = viewingLetter.fields || {};
+                          const contentFields = ['body', 'notice_content', 'letter_content', 'meeting_objectives', 'impact_description', 'personal_message'];
+                          
+                          // Look for content in template-specific fields
+                          for (const fieldName of contentFields) {
+                            if (fields[fieldName]) {
+                              return fields[fieldName];
+                            }
+                          }
+                          
+                          // Fallback to main content field
+                          return viewingLetter.content || 'No content available';
+                        })()}
                       </p>
                     </div>
                   </div>
@@ -573,7 +841,7 @@ export default function Letters() {
                   {/* Closing */}
                   <div className="mt-8">
                     <p className="text-sm text-gray-700 mb-4">Sincerely,</p>
-                    <div className="text-sm text-gray-700">
+                    <div className="text-sm text-gray-700 font-medium">
                       {viewingLetter.fields?.sender_name || viewingLetter.user?.name || 'Your Name'}
                     </div>
                     {viewingLetter.fields?.sender_position && (

@@ -118,6 +118,12 @@ class LetterTypeSeeder extends Seeder
             'name' => 'Confidential Message',
             'description' => 'Private and personal correspondence emphasizing privacy for confidential matters, family communication, or sensitive business relations.',
             'template_fields' => [
+                'company_name' => 'text',
+                'address_line1' => 'text',
+                'address_line2' => 'text',
+                'city' => 'text',
+                'state' => 'text',
+                'zip_code' => 'text',
                 'sender_name' => 'text',
                 'sender_address' => 'textarea',
                 'recipient_name' => 'text',
