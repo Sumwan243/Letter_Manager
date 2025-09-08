@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
@@ -187,18 +188,23 @@ export default function Letters() {
 
   const getLetterLayout = (letterType) => {
     const typeName = letterType?.name?.toLowerCase() || '';
-    
-    if (typeName.includes('professional') || typeName.includes('business')) {
-      return 'business'; // Formal business letter layout
-    } else if (typeName.includes('job') || typeName.includes('application')) {
-      return 'cover-letter'; // Cover letter layout
-    } else if (typeName.includes('meeting')) {
-      return 'memo'; // Memo layout
-    } else if (typeName.includes('announcement') || typeName.includes('notice')) {
-      return 'announcement'; // Announcement layout
-    } else {
-      return 'standard'; // Default layout
+
+    // New minimal set
+    if (typeName.includes('formal') && typeName.includes('executive')) {
+      return 'executive';
     }
+    if (typeName.includes('formal') && typeName.includes('staff')) {
+      return 'staff';
+    }
+    if (typeName.includes('informal')) {
+      return 'informal';
+    }
+
+    // Backward compatibility with previous names, if any remain
+    if (typeName.includes('professional') || typeName.includes('business')) return 'executive';
+    if (typeName.includes('confidential') || typeName.includes('private')) return 'informal';
+
+    return 'standard';
   };
 
   const handleLetterDelete = async (letterId) => {
@@ -399,9 +405,9 @@ export default function Letters() {
 
                 <div className="space-y-4">
                   <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Letter Type</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Letter Style</label>
                     <select value={selectedType} onChange={(e) => setSelectedType(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                      <option value="">Select Letter Type</option>
+                      <option value="">Choose Your Letter Style</option>
                       {letterTypes.map(type => <option key={type.id} value={type.id}>{type.name}</option>)}
                     </select>
                   </div>
@@ -460,158 +466,81 @@ export default function Letters() {
                     const fields = viewingLetter.fields || {};
                     
                     // Different layouts based on letter type
-                    if (typeName.includes('professional') || typeName.includes('business')) {
-                      // Business Letter Layout
+                    if (getLetterLayout(viewingLetter.letter_type) === 'executive') {
+                      // Formal – Executive Layout
                       return (
                         <>
-                          {/* Company Logo - Centered */}
-                          {fields.company_logo && (
-                            <div className="text-center mb-8">
-                              <img 
-                                src={fields.company_logo} 
-                                alt="Company Logo" 
-                                className="h-32 w-auto object-contain mx-auto"
-                              />
-                            </div>
-                          )}
-
-                          {/* Company Header with Date */}
+                          {/* Header with optional logo on the left and date on the right */}
                           <div className="flex justify-between items-start mb-8">
-                            <div className="flex-1">
-                              <h2 className="text-xl font-bold text-gray-900 mb-1">
-                                {fields.company_name || fields.sender_company || 'Company Name'}
-                              </h2>
-                              {fields.address_line1 && (
-                                <p className="text-sm text-gray-600">{fields.address_line1}</p>
+                            <div className="flex items-start space-x-4 flex-1">
+                              {fields.company_logo && (
+                                <img
+                                  src={fields.company_logo}
+                                  alt="Company Logo"
+                                  className="h-16 w-auto object-contain"
+                                />
                               )}
-                              {fields.address_line2 && (
-                                <p className="text-sm text-gray-600">{fields.address_line2}</p>
-                              )}
-                              {fields.city && fields.state && (
-                                <p className="text-sm text-gray-600">
-                                  {fields.city}, {fields.state} {fields.zip_code}
-                                </p>
-                              )}
+                              <div>
+                                <h2 className="text-xl font-bold text-gray-900 mb-1">
+                                  {fields.company_name || fields.sender_company || ''}
+                                </h2>
+                                {fields.address_line1 && (
+                                  <p className="text-sm text-gray-600">{fields.address_line1}</p>
+                                )}
+                                {fields.address_line2 && (
+                                  <p className="text-sm text-gray-600">{fields.address_line2}</p>
+                                )}
+                                {(fields.city || fields.state || fields.zip_code) && (
+                                  <p className="text-sm text-gray-600">
+                                    {[fields.city, fields.state].filter(Boolean).join(', ')}{(fields.city || fields.state) && fields.zip_code ? ` ${fields.zip_code}` : fields.zip_code || ''}
+                                  </p>
+                                )}
+                              </div>
                             </div>
                             <div className="text-right">
                               <p className="text-sm text-gray-600">
-                                {viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', { 
-                                  year: 'numeric', 
-                                  month: 'long', 
-                                  day: 'numeric' 
-                                }) : 'Date'}
+                                {viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric'
+                                }) : ''}
                               </p>
                             </div>
                           </div>
                         </>
                       );
-                    } else if (typeName.includes('job') || typeName.includes('application')) {
-                      // Cover Letter Layout
+                    } else if (getLetterLayout(viewingLetter.letter_type) === 'staff') {
+                      // Formal – Staff Layout (limited header, no logo)
                       return (
                         <>
-                          {/* Applicant Header */}
-                          <div className="mb-8">
-                            <h2 className="text-xl font-bold text-gray-900 mb-2">
-                              {fields.applicant_name || 'Your Name'}
-                            </h2>
-                            {fields.applicant_address && (
-                              <p className="text-sm text-gray-600 whitespace-pre-line">{fields.applicant_address}</p>
-                            )}
-                            <div className="mt-2 text-sm text-gray-600">
-                              {fields.applicant_phone && <span>Phone: {fields.applicant_phone}</span>}
-                              {fields.applicant_email && <span className="ml-4">Email: {fields.applicant_email}</span>}
+                          {/* Limited Header and date */}
+                          <div className="flex justify-between items-start mb-8">
+                            <div className="flex-1">
+                              {(fields.company_name || fields.department_name) && (
+                                <div>
+                                  {fields.company_name && (
+                                    <h2 className="text-lg font-semibold text-gray-900">{fields.company_name}</h2>
+                                  )}
+                                  {fields.department_name && (
+                                    <p className="text-sm text-gray-700">{fields.department_name}</p>
+                                  )}
+                                </div>
+                              )}
                             </div>
-                          </div>
-
-                          {/* Application Date */}
-                          <div className="mb-6 text-right">
-                            <p className="text-sm text-gray-600">
-                              {fields.application_date || (viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', { 
-                                year: 'numeric', 
-                                month: 'long', 
-                                day: 'numeric' 
-                              }) : 'Date')}
-                            </p>
-                          </div>
-                        </>
-                      );
-                    } else if (typeName.includes('announcement') || typeName.includes('notice')) {
-                      // Official Notice Layout
-                      return (
-                        <>
-                          {/* Notice Header */}
-                          <div className="text-center mb-8 border-b-2 border-gray-300 pb-4">
-                            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                              {fields.notice_title || 'OFFICIAL NOTICE'}
-                            </h2>
-                            {fields.notice_number && (
-                              <p className="text-sm text-gray-600">Notice No: {fields.notice_number}</p>
-                            )}
-                          </div>
-
-                          {/* Notice Info */}
-                          <div className="mb-6">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p className="text-sm font-semibold text-gray-900">
-                                  From: {fields.sender_name || fields.issuing_authority || 'Authority'}
-                                </p>
-                                {fields.sender_position && (
-                                  <p className="text-sm text-gray-600">{fields.sender_position}</p>
-                                )}
-                                {fields.sender_department && (
-                                  <p className="text-sm text-gray-600">{fields.sender_department}</p>
-                                )}
-                              </div>
-                              <div className="text-right">
-                                <p className="text-sm text-gray-600">
-                                  Date: {fields.effective_date || fields.publication_date || (viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', { 
-                                    year: 'numeric', 
-                                    month: 'long', 
-                                    day: 'numeric' 
-                                  }) : 'Date')}
-                                </p>
-                              </div>
+                            <div className="text-right">
+                              <p className="text-sm text-gray-600">
+                                {fields.letter_date || (viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric'
+                                }) : '')}
+                              </p>
                             </div>
                           </div>
                         </>
                       );
-                    } else if (typeName.includes('meeting')) {
-                      // Memo Layout
-                      return (
-                        <>
-                          {/* Memo Header */}
-                          <div className="border-b-2 border-black pb-4 mb-8">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <h2 className="text-xl font-bold text-gray-900 mb-1">MEMORANDUM</h2>
-                                <p className="text-sm text-gray-600">To: {fields.attendees || 'Team Members'}</p>
-                                <p className="text-sm text-gray-600">From: {fields.organizer_name || 'Organizer'}</p>
-                                {fields.organizer_position && (
-                                  <p className="text-sm text-gray-600">{fields.organizer_position}</p>
-                                )}
-                              </div>
-                              <div className="text-right">
-                                <p className="text-sm text-gray-600">
-                                  Date: {fields.meeting_date || (viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', { 
-                                    year: 'numeric', 
-                                    month: 'long', 
-                                    day: 'numeric' 
-                                  }) : 'Date')}
-                                </p>
-                                {fields.meeting_time && (
-                                  <p className="text-sm text-gray-600">Time: {fields.meeting_time}</p>
-                                )}
-                                {fields.meeting_location && (
-                                  <p className="text-sm text-gray-600">Location: {fields.meeting_location}</p>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </>
-                      );
-                    } else if (typeName.includes('confidential') || typeName.includes('private')) {
-                      // Personal Letter Layout
+                    } else if (getLetterLayout(viewingLetter.letter_type) === 'informal') {
+                      // Informal (personal) Layout
                       return (
                         <>
                           {/* Personal Letter Header */}
@@ -619,21 +548,10 @@ export default function Letters() {
                             <div className="flex justify-between items-start">
                               <div>
                                 <h2 className="text-xl font-bold text-gray-900 mb-1">
-                                  {fields.company_name || fields.sender_company || fields.sender_name || 'Your Name'}
+                                  {fields.sender_name || 'Your Name'}
                                 </h2>
                                 {fields.sender_address && (
                                   <p className="text-sm text-gray-600 whitespace-pre-line">{fields.sender_address}</p>
-                                )}
-                                {fields.address_line1 && (
-                                  <p className="text-sm text-gray-600">{fields.address_line1}</p>
-                                )}
-                                {fields.address_line2 && (
-                                  <p className="text-sm text-gray-600">{fields.address_line2}</p>
-                                )}
-                                {fields.city && fields.state && (
-                                  <p className="text-sm text-gray-600">
-                                    {fields.city}, {fields.state} {fields.zip_code}
-                                  </p>
                                 )}
                               </div>
                               <div className="text-right">
@@ -642,43 +560,7 @@ export default function Letters() {
                                     year: 'numeric', 
                                     month: 'long', 
                                     day: 'numeric' 
-                                  }) : 'Date')}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        </>
-                      );
-                    } else if (typeName.includes('confirmation') || typeName.includes('receipt')) {
-                      // Receipt/Confirmation Layout
-                      return (
-                        <>
-                          {/* Receipt Header */}
-                          <div className="text-center mb-8 border-b border-gray-300 pb-4">
-                            <h2 className="text-xl font-bold text-gray-900 mb-2">CONFIRMATION RECEIPT</h2>
-                            {fields.receipt_number && (
-                              <p className="text-sm text-gray-600">Receipt No: {fields.receipt_number}</p>
-                            )}
-                          </div>
-
-                          {/* Receipt Info */}
-                          <div className="mb-6">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p className="text-sm font-semibold text-gray-900">
-                                  From: {fields.sender_name || 'Sender'}
-                                </p>
-                                {fields.sender_company && (
-                                  <p className="text-sm text-gray-600">{fields.sender_company}</p>
-                                )}
-                              </div>
-                              <div className="text-right">
-                                <p className="text-sm text-gray-600">
-                                  Date: {fields.receipt_date || fields.received_date || (viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', { 
-                                    year: 'numeric', 
-                                    month: 'long', 
-                                    day: 'numeric' 
-                                  }) : 'Date')}
+                                  }) : '')}
                                 </p>
                               </div>
                             </div>
@@ -686,45 +568,43 @@ export default function Letters() {
                         </>
                       );
                     } else {
-                      // Default Business Letter Layout
+                      // Fallback to executive style
                       return (
                         <>
-                          {/* Company Logo - Centered */}
-                          {fields.company_logo && (
-                            <div className="text-center mb-8">
-                              <img 
-                                src={fields.company_logo} 
-                                alt="Company Logo" 
-                                className="h-32 w-auto object-contain mx-auto"
-                              />
-                            </div>
-                          )}
-
-                          {/* Company Header with Date */}
+                          {/* Header with optional logo on the left and date on the right */}
                           <div className="flex justify-between items-start mb-8">
-                            <div className="flex-1">
-                              <h2 className="text-xl font-bold text-gray-900 mb-1">
-                                {fields.company_name || fields.sender_company || 'Company Name'}
-                              </h2>
-                              {fields.address_line1 && (
-                                <p className="text-sm text-gray-600">{fields.address_line1}</p>
+                            <div className="flex items-start space-x-4 flex-1">
+                              {fields.company_logo && (
+                                <img
+                                  src={fields.company_logo}
+                                  alt="Company Logo"
+                                  className="h-16 w-auto object-contain"
+                                />
                               )}
-                              {fields.address_line2 && (
-                                <p className="text-sm text-gray-600">{fields.address_line2}</p>
-                              )}
-                              {fields.city && fields.state && (
-                                <p className="text-sm text-gray-600">
-                                  {fields.city}, {fields.state} {fields.zip_code}
-                                </p>
-                              )}
+                              <div>
+                                <h2 className="text-xl font-bold text-gray-900 mb-1">
+                                  {fields.company_name || fields.sender_company || ''}
+                                </h2>
+                                {fields.address_line1 && (
+                                  <p className="text-sm text-gray-600">{fields.address_line1}</p>
+                                )}
+                                {fields.address_line2 && (
+                                  <p className="text-sm text-gray-600">{fields.address_line2}</p>
+                                )}
+                                {(fields.city || fields.state || fields.zip_code) && (
+                                  <p className="text-sm text-gray-600">
+                                    {[fields.city, fields.state].filter(Boolean).join(', ')}{(fields.city || fields.state) && fields.zip_code ? ` ${fields.zip_code}` : fields.zip_code || ''}
+                                  </p>
+                                )}
+                              </div>
                             </div>
                             <div className="text-right">
                               <p className="text-sm text-gray-600">
-                                {viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', { 
-                                  year: 'numeric', 
-                                  month: 'long', 
-                                  day: 'numeric' 
-                                }) : 'Date'}
+                                {viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric'
+                                }) : ''}
                               </p>
                             </div>
                           </div>
@@ -772,21 +652,17 @@ export default function Letters() {
                         const fields = viewingLetter.fields || {};
                         const typeName = viewingLetter.letter_type?.name?.toLowerCase() || '';
                         
-                        if (typeName.includes('meeting')) {
-                          return fields.attendees || fields.target_audience || 'Team Members';
-                        } else if (typeName.includes('job') || typeName.includes('application')) {
-                          return fields.hiring_manager_name || fields.recipient_name || 'Hiring Manager';
-                        } else if (typeName.includes('announcement') || typeName.includes('notice')) {
-                          return fields.target_audience || fields.recipient_name || 'All Staff';
-                        } else if (typeName.includes('confirmation') || typeName.includes('receipt')) {
-                          return fields.recipient_name || fields.recipient_company || 'Recipient';
-                        } else if (typeName.includes('professional') || typeName.includes('business')) {
+                        const layout = getLetterLayout(viewingLetter.letter_type);
+                        if (layout === 'executive') {
                           return fields.recipient_name || fields.recipient_company || 'Client/Partner';
-                        } else if (typeName.includes('confidential') || typeName.includes('private')) {
-                          return fields.recipient_name || 'Recipient';
-                        } else {
-                          return fields.recipient_name || fields.recipient || fields.to || 'Not specified';
                         }
+                        if (layout === 'staff') {
+                          return fields.recipient_name || fields.recipient_company || 'Client';
+                        }
+                        if (layout === 'informal') {
+                          return fields.recipient_name || 'Recipient';
+                        }
+                        return fields.recipient_name || fields.recipient || fields.to || 'Not specified';
                       })()}
                     </div>
                     {viewingLetter.fields?.recipient_title && (
