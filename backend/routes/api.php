@@ -5,6 +5,7 @@ use App\Http\Controllers\API\AuthController;
 use App\Http\Controllers\API\LetterTypeController;
 use App\Http\Controllers\API\LetterController;
 use App\Http\Controllers\API\LetterTemplateController;
+use App\Http\Controllers\API\UserController;
 
 // Public routes
 Route::prefix('auth')->group(function () {
@@ -31,6 +32,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Letter template routes
     Route::apiResource('letter-templates', LetterTemplateController::class);
+
+    // Profile
+    Route::post('/profile', [UserController::class, 'updateProfile']);
     
     // Admin-only routes
     Route::middleware('admin')->group(function () {

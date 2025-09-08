@@ -1,4 +1,5 @@
 import { useContext, useState } from 'react';
+import axios from 'axios';
 import Sidebar from '../components/Sidebar';
 import { AuthContext } from '../context/AuthContext';
 
@@ -21,8 +22,10 @@ export default function Settings() {
   const handleSave = async () => {
     try {
       setSaving(true);
-      // TODO: call backend endpoint to save profile and avatar
-      alert('Profile saved (stub).');
+      const resp = await axios.post('/api/profile', { name, email, avatar });
+      alert('Profile saved');
+    } catch (e) {
+      alert(e?.response?.data?.message || 'Failed to save profile');
     } finally {
       setSaving(false);
     }
