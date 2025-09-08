@@ -230,6 +230,16 @@ export default function Letters() {
     }
   };
 
+  // Recipient resolver for list view based on new layouts
+  const getListRecipient = (letter) => {
+    const fields = letter?.fields || {};
+    const layout = getLetterLayout(letter?.letter_type);
+    if (layout === 'executive') return fields.recipient_name || fields.recipient_company || 'Client/Partner';
+    if (layout === 'staff') return fields.recipient_name || fields.recipient_company || 'Client';
+    if (layout === 'informal') return fields.recipient_name || 'Recipient';
+    return fields.recipient_name || fields.recipient || fields.to || 'Not specified';
+  };
+
   const refreshLetters = async () => {
     try {
       setRefreshing(true);
@@ -347,11 +357,11 @@ export default function Letters() {
                           <div className="flex-1">
                             <div className="flex items-center space-x-3 mb-2">
                               <h4 className="text-lg font-medium text-gray-900 dark:text-white">{letter.title || letter.fields?.subject || 'Untitled Letter'}</h4>
-                              <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(letter.status)}`}>{letter.status || 'Unknown'}</span>
+                              {/* Hide status badge for a cleaner list; can re-enable when send/receive is added */}
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
                               <div><span className="font-medium">Type:</span> {letter.letter_type?.name || 'Unknown'}</div>
-                              <div><span className="font-medium">To:</span> {letter.fields?.recipient || letter.fields?.to || 'Not specified'}</div>
+                              <div><span className="font-medium">To:</span> {getListRecipient(letter)}</div>
                               <div><span className="font-medium">Created:</span> {letter.created_at ? new Date(letter.created_at).toLocaleDateString() : 'Unknown date'}</div>
                             </div>
                             {user?.role === 'admin' && (
@@ -405,11 +415,23 @@ export default function Letters() {
 
                 <div className="space-y-4">
                   <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Letter Style</label>
-                    <select value={selectedType} onChange={(e) => setSelectedType(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                      <option value="">Choose Your Letter Style</option>
-                      {letterTypes.map(type => <option key={type.id} value={type.id}>{type.name}</option>)}
-                    </select>
+                    <div className="relative">
+                      <select
+                        value={selectedType}
+                        onChange={(e) => setSelectedType(e.target.value)}
+                        className="appearance-none w-full px-4 py-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      >
+                        <option value="" disabled hidden>
+                          Choose Your Letter Style
+                        </option>
+                        {letterTypes.map(type => (
+                          <option key={type.id} value={type.id}>{type.name}</option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500">
+                        <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" /></svg>
+                      </div>
+                    </div>
                   </div>
 
                   {selectedType && (
