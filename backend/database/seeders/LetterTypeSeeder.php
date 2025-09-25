@@ -55,25 +55,21 @@ class LetterTypeSeeder extends Seeder
             [
             'description' => 'Formal client letters from staff; lean header without logo, department emphasis.',
             'template_fields' => [
-                // Header (limited)
-                'company_name' => 'text',
+                // Header
+                'company_logo' => 'file',
                 'department_name' => 'text',
-                // Sender
-                'sender_name' => 'text',
-                'sender_position' => 'text',
-                // Recipient
-                'recipient_name' => 'text',
-                'recipient_company' => 'text',
-                'recipient_address' => 'textarea',
+                // Parties
+                'sender_name' => 'text', // FROM
+                'recipient_name' => 'text', // TO
                 // Meta
+                'ref_no' => 'text',
                 'letter_date' => 'date',
-                'salutation' => 'text',
                 'subject' => 'text',
-                'reference_id' => 'text',
-                // Body (concise)
+                // Body
                 'body' => 'textarea',
-                'next_steps' => 'textarea',
-                'contact_information' => 'text',
+                // Footer
+                'phone' => 'text',
+                'signature_image' => 'file',
             ],
             'is_active' => true,
         ]);

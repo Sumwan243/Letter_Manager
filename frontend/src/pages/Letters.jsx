@@ -21,11 +21,13 @@ export default function Letters() {
   const [editingLetter, setEditingLetter] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [previewFontFamily, setPreviewFontFamily] = useState('sans');
-  const [previewFontSize, setPreviewFontSize] = useState(14);
+  const [previewFontSize, setPreviewFontSize] = useState(16);
+  // (reverted) keep original send flow; no status filter
   const [sendModalOpen, setSendModalOpen] = useState(false);
   const [sendTargetLetter, setSendTargetLetter] = useState(null);
   const [sendToEmail, setSendToEmail] = useState('');
   const [sending, setSending] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
 
   // Debug logging
   console.log('Rendering Letters with:', { user, loading, error, letters });
@@ -236,38 +238,7 @@ export default function Letters() {
     }
   };
 
-  const openSendModal = (letter) => {
-    setSendTargetLetter(letter);
-    setSendToEmail('');
-    setSendModalOpen(true);
-  };
-
-  const closeSendModal = () => {
-    setSendModalOpen(false);
-    setSendTargetLetter(null);
-    setSendToEmail('');
-  };
-
-  const handleSendSubmit = async () => {
-    const email = (sendToEmail || '').trim();
-    const emailValid = /.+@.+\..+/.test(email);
-    if (!emailValid) {
-      alert('Please enter a valid recipient email address.');
-      return;
-    }
-    if (!sendTargetLetter) return;
-    try {
-      setSending(true);
-      await handleStatusChange(sendTargetLetter.id, 'sent');
-      alert(`Letter queued to be sent to ${email}.`);
-      closeSendModal();
-    } catch (e) {
-      console.error(e);
-      alert('Failed to send.');
-    } finally {
-      setSending(false);
-    }
-  };
+  // Keep original send flow (no-op change marker)
 
   // Recipient resolver for list view based on new layouts
   const getListRecipient = (letter) => {
@@ -552,62 +523,191 @@ export default function Letters() {
 
       {/* Letter View Modal */}
       {viewingLetter && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                {viewingLetter.title || 'Letter View'}
-              </h2>
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4 print:static print:bg-transparent print:p-0">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden print:shadow-none print:max-w-none print:max-h-none print:rounded-none print:w-auto">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between no-print">
               <div className="flex items-center gap-3">
-                {/* Font controls */}
-                <select value={previewFontFamily} onChange={(e) => setPreviewFontFamily(e.target.value)} className="text-sm px-2 py-1 border border-gray-300 rounded-md">
-                  <option value="sans">Sans</option>
-                  <option value="serif">Serif</option>
-                  <option value="mono">Mono</option>
-                </select>
-                <input type="range" min={12} max={20} value={previewFontSize} onChange={(e) => setPreviewFontSize(Number(e.target.value))} className="w-24" />
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                  {viewingLetter.title || 'Letter View'}
+                </h2>
+                {/* Options Dropdown (font settings) */}
+                <div className="relative">
+                  <button className="btn btn-sm" onClick={() => setOptionsOpen((v) => !v)}>
+                    Options ▾
+                  </button>
+                  {optionsOpen && (
+                    <div className="absolute left-0 mt-2 w-64 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-3 z-10">
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs text-gray-600 dark:text-gray-300 mb-1">Font family</label>
+                          <select value={previewFontFamily} onChange={(e) => setPreviewFontFamily(e.target.value)} className="w-full text-sm px-2 py-1 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+                            <option value="sans">Sans</option>
+                            <option value="serif">Serif</option>
+                            <option value="mono">Mono</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-600 dark:text-gray-300 mb-1">Font size: {previewFontSize}px</label>
+                          <input type="range" min={12} max={20} value={previewFontSize} onChange={(e) => setPreviewFontSize(Number(e.target.value))} className="w-full" />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            className="btn btn-sm"
+                            onClick={() => setOptionsOpen(false)}
+                          >
+                            Close
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (!viewingLetter?.id) return;
+                              const payload = JSON.stringify({ fontFamily: previewFontFamily, fontSize: previewFontSize });
+                              localStorage.setItem(`letterPreview:${viewingLetter.id}`, payload);
+                              setOptionsOpen(false);
+                            }}
+                            className="btn btn-primary btn-sm"
+                          >
+                            Save
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => {
-                    if (!viewingLetter?.id) return;
-                    const payload = JSON.stringify({ fontFamily: previewFontFamily, fontSize: previewFontSize });
-                    localStorage.setItem(`letterPreview:${viewingLetter.id}`, payload);
-                    alert('Preview settings saved');
-                  }}
-                  className="px-3 py-1 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                  onClick={() => window.print()}
+                  className="btn btn-primary"
                 >
-                  Save
+                  <span className="inline-flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+                    Print
+                  </span>
                 </button>
                 <button
                   onClick={closeLetterView}
-                  className="px-4 py-2 text-sm rounded-lg bg-red-100 dark:bg-red-700 text-red-700 dark:text-red-200 hover:bg-red-200 dark:hover:bg-red-600 font-medium"
+                  aria-label="Close"
+                  className="px-3 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200"
+                  title="Close"
                 >
-                  ✕ Close
+                  Close
                 </button>
               </div>
             </div>
             
-            <div className="p-8 bg-gray-50 dark:bg-gray-800/50 overflow-auto" style={{ maxHeight: 'calc(90vh - 120px)' }}>
+            <div className="p-8 bg-gray-50 dark:bg-gray-800/50 overflow-auto print:p-0" style={{ maxHeight: 'calc(90vh - 120px)' }}>
               {/* A4 Paper Layout */}
               <div 
-                className={`mx-auto bg-white text-gray-900 shadow-lg print:shadow-none ${previewFontFamily === 'serif' ? 'font-serif' : previewFontFamily === 'mono' ? 'font-mono' : 'font-sans'}`}
+                className={`mx-auto bg-white text-gray-900 shadow-lg print:shadow-none printable font-scale ${previewFontFamily === 'serif' ? 'font-serif' : previewFontFamily === 'mono' ? 'font-mono' : 'font-sans'}`}
                 style={{ 
                   width: '210mm', 
-                  minHeight: '297mm', 
+                  minHeight: 'auto', 
                   padding: '20mm',
                   boxSizing: 'border-box',
                   backgroundColor: 'white',
-                  fontSize: `${previewFontSize}px`
+                  fontSize: `${previewFontSize}px`,
+                  lineHeight: 1.6
                 }}
               >
 
                 {/* Letter Layout */}
-                <div className={`space-y-6`}>
-                  {(() => {
+                {(() => {
+                  const fields = viewingLetter.fields || {};
+                  const layout = getLetterLayout(viewingLetter.letter_type);
+
+                  if (layout === 'staff') {
+                    // Formal Staff Layout - strictly limited fields per spec
+                    const subjectText = fields.subject || '';
+                    const contentText = fields.body || '';
+                    const printDate = fields.letter_date || '';
+                    const fromText = fields.sender_name || fields.department_name || '';
+                    const recipientText = fields.recipient_name || fields.recipient || '';
+                    const refNoText = fields.ref_no || fields.reference_no || '';
+                    const phoneText = fields.phone || fields.contact_information || '';
+                    const companyLogo = fields.company_logo || '';
+                    const signatureImage = fields.signature_image || fields.signature || '';
+
+                    return (
+                      <div style={{ fontFamily: 'Times New Roman, Times, serif' }} className="space-y-6">
+                        {/* Header: Logo + University Name */}
+                        <div className="text-center">
+                          {companyLogo && (
+                            <div className="mb-3">
+                              <img src={companyLogo} alt="Company Logo" className="mx-auto h-16 w-auto object-contain" />
+                            </div>
+                          )}
+                          <div className="uppercase font-bold" style={{ fontSize: '24px' }}>JIMMA UNIVERSITY</div>
+                          <div className="font-bold" style={{ fontSize: '24px' }}>ጅማ ዩኒቨርሲቲ</div>
+                        </div>
+
+                        {/* From / Ref No / Date */}
+                        <div style={{ fontSize: '18px' }} className="font-bold">
+                          <div className="flex items-start justify-between">
+                            <div>From: {fromText}</div>
+                            <div className="text-right space-y-1">
+                              <div>
+                                Ref No: <span className="underline underline-offset-2 decoration-gray-700">{refNoText}</span>
+                              </div>
+                              <div>
+                                Date: <span className="underline underline-offset-2 decoration-gray-700">{printDate}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Recipient (TO) */}
+                        {recipientText && (
+                          <div style={{ fontSize: '16px' }}>
+                            <span className="font-bold">To:</span>{' '}<em>{recipientText}</em>
+                          </div>
+                        )}
+
+                        {/* Subject */}
+                        {subjectText && (
+                          <div className="mt-2" style={{ fontSize: '16px' }}>
+                            <span className="font-bold">Subject:</span>{' '}
+                            <span className="underline underline-offset-2 decoration-gray-700">{subjectText}</span>
+                          </div>
+                        )}
+
+                        {/* Body */}
+                        {contentText && (
+                          <div className="text-justify" style={{ fontSize: '16px', lineHeight: 1.5 }}>
+                            <p className="whitespace-pre-wrap">{contentText}</p>
+                          </div>
+                        )}
+
+                        {/* Closing */}
+                        <div className="space-y-2" style={{ fontSize: '16px' }}>
+                          <div>Kind Regards,</div>
+                          {fields.sender_name && (
+                            <div className="font-medium">{fields.sender_name}</div>
+                          )}
+                          {phoneText && (
+                            <div className="text-gray-700">{phoneText}</div>
+                          )}
+                          {/* Signature Area */}
+                          <div className="mt-6">
+                            {signatureImage ? (
+                              <img src={signatureImage} alt="Signature" className="h-16 w-auto object-contain" />
+                            ) : (
+                              <div className="border-t border-gray-400 w-48" />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Default path renders header then generic sections below
+                  return (
+                    <div className={`space-y-6`}>
+                    {(() => {
                     const typeName = viewingLetter.letter_type?.name?.toLowerCase() || '';
-                    const fields = viewingLetter.fields || {};
+                    const fieldsInner = viewingLetter.fields || {};
                     
                     // Different layouts based on letter type
-                    if (getLetterLayout(viewingLetter.letter_type) === 'executive') {
+                    if (layout === 'executive') {
                       // Formal – Executive Layout
                       return (
                         <>
@@ -615,30 +715,30 @@ export default function Letters() {
                           <div className="flex justify-between items-start mb-8">
                             <div className="flex-1">
                               <div className="flex items-center space-x-4">
-                                {fields.company_logo && (
+                                {fieldsInner.company_logo && (
                                   <img
-                                    src={fields.company_logo}
+                                    src={fieldsInner.company_logo}
                                     alt="Company Logo"
                                     className="h-16 w-auto object-contain"
                                   />
                                 )}
-                                {(fields.company_name || fields.sender_company) && (
+                                {(fieldsInner.company_name || fieldsInner.sender_company) && (
                                   <h2 className="text-xl font-bold text-gray-900">
-                                    {fields.company_name || fields.sender_company}
+                                    {fieldsInner.company_name || fieldsInner.sender_company}
                                   </h2>
                                 )}
                               </div>
                               {/* Address below the logo/name to avoid cramping */}
                               <div className="mt-2">
-                                {fields.address_line1 && (
-                                  <p className="text-sm text-gray-600">{fields.address_line1}</p>
+                                {fieldsInner.address_line1 && (
+                                  <p className="text-sm text-gray-600">{fieldsInner.address_line1}</p>
                                 )}
-                                {fields.address_line2 && (
-                                  <p className="text-sm text-gray-600">{fields.address_line2}</p>
+                                {fieldsInner.address_line2 && (
+                                  <p className="text-sm text-gray-600">{fieldsInner.address_line2}</p>
                                 )}
-                                {(fields.city || fields.state || fields.zip_code) && (
+                                {(fieldsInner.city || fieldsInner.state || fieldsInner.zip_code) && (
                                   <p className="text-sm text-gray-600">
-                                    {[fields.city, fields.state].filter(Boolean).join(', ')}{(fields.city || fields.state) && fields.zip_code ? ` ${fields.zip_code}` : fields.zip_code || ''}
+                                    {[fieldsInner.city, fieldsInner.state].filter(Boolean).join(', ')}{(fieldsInner.city || fieldsInner.state) && fieldsInner.zip_code ? ` ${fieldsInner.zip_code}` : fieldsInner.zip_code || ''}
                                   </p>
                                 )}
                               </div>
@@ -650,36 +750,6 @@ export default function Letters() {
                                   month: 'long',
                                   day: 'numeric'
                                 }) : ''}
-                              </p>
-                            </div>
-                          </div>
-                        </>
-                      );
-                    } else if (getLetterLayout(viewingLetter.letter_type) === 'staff') {
-                      // Formal – Staff Layout (limited header, no logo)
-                      return (
-                        <>
-                          {/* Limited Header and date */}
-                          <div className="flex justify-between items-start mb-8">
-                            <div className="flex-1">
-                              {(fields.company_name || fields.department_name) && (
-                                <div>
-                                  {fields.company_name && (
-                                    <h2 className="text-lg font-semibold text-gray-900">{fields.company_name}</h2>
-                                  )}
-                                  {fields.department_name && (
-                                    <p className="text-sm text-gray-700">{fields.department_name}</p>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm text-gray-600">
-                                {fields.letter_date || (viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', {
-                                  year: 'numeric',
-                                  month: 'long',
-                                  day: 'numeric'
-                                }) : '')}
                               </p>
                             </div>
                           </div>
@@ -877,6 +947,8 @@ export default function Letters() {
                     )}
                   </div>
                 </div>
+                  );
+                })()}
               </div>
             </div>
           </div>

@@ -13,6 +13,7 @@ import LetterTemplateForm from './pages/LetterTemplateForm';
 import Settings from './pages/Settings';
 import PrivateRoute from './components/PrivateRoute';
 import ErrorBoundary from './components/ErrorBoundary';
+import AdminRecipients from './pages/AdminRecipients';
 
 export default function App() {
   return (
@@ -32,6 +33,14 @@ export default function App() {
               element={
                 <PrivateRoute roles={['admin']}>
                   <AdminDashboard />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/admin/recipients"
+              element={
+                <PrivateRoute roles={['admin']}>
+                  <AdminRecipients />
                 </PrivateRoute>
               }
             />

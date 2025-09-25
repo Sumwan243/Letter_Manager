@@ -6,6 +6,8 @@ use App\Http\Controllers\API\LetterTypeController;
 use App\Http\Controllers\API\LetterController;
 use App\Http\Controllers\API\LetterTemplateController;
 use App\Http\Controllers\API\UserController;
+use App\Http\Controllers\API\DepartmentController;
+use App\Http\Controllers\API\StaffController;
 
 // Public routes
 Route::prefix('auth')->group(function () {
@@ -32,6 +34,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Letter template routes
     Route::apiResource('letter-templates', LetterTemplateController::class);
+    // Departments
+    Route::get('/departments', [DepartmentController::class, 'index']);
+    Route::post('/departments', [DepartmentController::class, 'store']);
+
+    // Staff
+    Route::get('/staff', [StaffController::class, 'index']); // accepts ?department_id=
+    Route::post('/staff', [StaffController::class, 'store']);
 
     // Profile
     Route::post('/profile', [UserController::class, 'updateProfile']);

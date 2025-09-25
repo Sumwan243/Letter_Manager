@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchLetterTypeById } from '../api/letters';
+import { fetchDepartments } from '../api/departments';
+import { fetchStaff } from '../api/staff';
 
 export default function DynamicForm({ typeId, onLetterCreated, editingLetter, editMode }) {
   const [fields, setFields] = useState([]);
@@ -7,6 +9,10 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
   const [loading, setLoading] = useState(true);
   const [letterType, setLetterType] = useState(null);
 
+  const [departments, setDepartments] = useState([]);
+  const [staff, setStaffList] = useState([]);
+  const [selectedDept, setSelectedDept] = useState('');
+  const [selectedStaff, setSelectedStaff] = useState('');
 
   useEffect(() => {
     const loadLetterType = async () => {
@@ -30,21 +36,17 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
           // Transform backend field structure to frontend format
           const transformedFields = [];
           if (type.template_fields) {
-            // Handle both array format (frontend) and object format (backend)
             if (Array.isArray(type.template_fields)) {
               transformedFields.push(...type.template_fields);
             } else {
-              // Backend format: { field_name: 'type' } or { field_name: { type: 'select', options: [...] } }
               Object.entries(type.template_fields).forEach(([fieldName, fieldConfig]) => {
                 if (typeof fieldConfig === 'string') {
-                  // Simple field: 'sender_name' => 'text'
-                                    transformedFields.push({
+                  transformedFields.push({
                     name: fieldName,
                     type: fieldConfig,
-                    required: false // No required fields
+                    required: false
                   });
                 } else if (typeof fieldConfig === 'object' && fieldConfig.type) {
-                  // Complex field: 'letter_type' => ['type' => 'select', 'options' => [...]]
                   transformedFields.push({
                     name: fieldName,
                     type: fieldConfig.type,
@@ -58,7 +60,6 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
 
           setFields(transformedFields);
 
-          // Initialize form data with existing values or empty values
           const initialData = {};
           transformedFields.forEach(field => {
             if (editMode && editingLetter?.fields?.[field.name]) {
@@ -69,9 +70,7 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
           });
           setFormData(initialData);
 
-          // Set existing letter data if editing
           if (editMode && editingLetter) {
-            // Populate form fields with editing letter data
             const editingData = {};
             transformedFields.forEach(field => {
               if (editingLetter.fields?.[field.name]) {
@@ -79,6 +78,16 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
               }
             });
             setFormData(editingData);
+          }
+
+          // Load departments/staff when staff template
+          if (type.name && type.name.toLowerCase().includes('staff')) {
+            try {
+              const depRes = await fetchDepartments();
+              setDepartments(depRes.data || []);
+            } catch (e) {
+              console.error('Failed to load departments', e);
+            }
           }
         } else {
           console.error('Letter type not found:', typeId);
@@ -97,6 +106,19 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
     }
   }, [typeId]);
 
+  useEffect(() => {
+    const loadStaff = async () => {
+      if (!selectedDept) { setStaffList([]); return; }
+      try {
+        const res = await fetchStaff(selectedDept);
+        setStaffList(res.data || []);
+      } catch (e) {
+        console.error('Failed to load staff', e);
+      }
+    };
+    loadStaff();
+  }, [selectedDept]);
+
   const handleChange = (e, name) => {
     setFormData(prev => ({ ...prev, [name]: e.target.value }));
   };
@@ -104,12 +126,10 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Find the main content field from the template
     const contentFields = ['body', 'notice_content', 'letter_content', 'meeting_objectives', 'impact_description', 'personal_message'];
     let mainContent = '';
     let title = '';
 
-    // Look for content in template-specific fields
     for (const fieldName of contentFields) {
       if (formData[fieldName]) {
         mainContent = formData[fieldName];
@@ -117,7 +137,6 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
       }
     }
 
-    // Look for title in template-specific fields
     const titleFields = ['notice_title', 'meeting_title', 'letter_purpose', 'job_title'];
     for (const fieldName of titleFields) {
       if (formData[fieldName]) {
@@ -132,17 +151,7 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
       letter_type_id: typeId,
       fields: formData
     });
-    
-    // Check if there are any file fields
-    const fileFields = Object.entries(formData).filter(([key, value]) => 
-      value && typeof value === 'string' && value.startsWith('data:image')
-    );
-    if (fileFields.length > 0) {
-      console.log('File fields found:', fileFields.map(([key]) => key));
-      console.log('Total data size:', JSON.stringify(formData).length);
-    }
 
-    // Call the callback with the complete form data
     if (onLetterCreated) {
       onLetterCreated({
         title: title,
@@ -161,7 +170,6 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
   };
 
   const renderField = (field) => {
-    // Handle both frontend and backend field structures
     const fieldType = field.type || (field[field.name] && typeof field[field.name] === 'object' ? field[field.name].type : 'text');
     const fieldOptions = field.options || (field[field.name] && field[field.name].options) || [];
 
@@ -184,7 +192,6 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
             placeholder={`Enter ${getFieldLabel(field.name).toLowerCase()}...`}
           />
         );
-
       case 'select':
         return (
           <select {...commonProps}>
@@ -196,7 +203,6 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
             ))}
           </select>
         );
-
       case 'date':
         return (
           <input
@@ -205,7 +211,6 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
             placeholder={`Select ${getFieldLabel(field.name).toLowerCase()}...`}
           />
         );
-
       case 'email':
         return (
           <input
@@ -214,7 +219,6 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
             placeholder={`Enter ${getFieldLabel(field.name).toLowerCase()}...`}
           />
         );
-
       case 'number':
         return (
           <input
@@ -223,7 +227,6 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
             placeholder={`Enter ${getFieldLabel(field.name).toLowerCase()}...`}
           />
         );
-
       case 'file':
         return (
           <div>
@@ -250,7 +253,6 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
             )}
           </div>
         );
-
       default:
         return (
           <input
@@ -261,6 +263,8 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
         );
     }
   };
+
+  const isStaffType = letterType?.name && letterType.name.toLowerCase().includes('staff');
 
   if (loading) {
     return (
@@ -291,6 +295,51 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
           {editMode ? 'Update the letter information below' : letterType.description || 'Fill in the required information for your letter'}
         </p>
+
+        {isStaffType && (
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Department</label>
+              <select
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                value={selectedDept}
+                onChange={async (e) => { setSelectedDept(e.target.value); setSelectedStaff(''); }}
+              >
+                <option value="">Select Department</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Staff</label>
+              <select
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                value={selectedStaff}
+                onChange={(e) => {
+                  const staffId = e.target.value;
+                  setSelectedStaff(staffId);
+                  const s = staff.find(x => String(x.id) === String(staffId));
+                  if (s) {
+                    setFormData(prev => ({
+                      ...prev,
+                      recipient_name: s.name,
+                      recipient: s.name,
+                      recipient_company: s.department?.name || '',
+                      sender_position: s.position || prev.sender_position || '',
+                    }));
+                  }
+                }}
+                disabled={!selectedDept}
+              >
+                <option value="">Select Staff</option>
+                {staff.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name} — {s.position}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Letter Fields */}
