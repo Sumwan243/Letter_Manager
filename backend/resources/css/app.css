@@ -9,27 +9,10 @@ body {
 
 /* Print styles for Inertia app */
 @media print {
-  /* Print only the .printable area */
-  body * {
-    visibility: hidden !important;
-  }
-  .printable, .printable * {
-    visibility: visible !important;
-  }
-  .printable {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: auto !important;
-    max-width: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    box-shadow: none !important;
-    background: #fff !important;
-  }
-
-  @page {
-    size: A4;
-    margin: 10mm;
-  }
+  /* Hide chrome; keep printable visible and centered */
+  .no-print, nav, header, footer, .sidebar, .overlay, .modal { display: none !important; }
+  .printable, .printable * { visibility: visible !important; }
+  .printable { display: block !important; position: static !important; width: 190mm !important; max-width: 190mm !important; margin: 0 auto !important; box-shadow: none !important; background: #fff !important; transform: none !important; }
+  html, body { height: auto !important; }
+  @page { size: A4; margin: 10mm; }
 }

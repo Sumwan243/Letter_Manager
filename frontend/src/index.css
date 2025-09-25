@@ -42,28 +42,25 @@ h1 {
 
 /* Print styles for SPA */
 @media print {
-  /* Print only the .printable area */
-  body * { visibility: hidden !important; }
-  .printable, .printable * { visibility: visible !important; }
-  .printable {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: auto !important;
-    max-width: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    box-shadow: none !important;
-    background: #fff !important;
-  }
+  /* Hide UI chrome only */
+  .no-print, nav, header, footer, .sidebar, .overlay, .modal, .fixed, .sticky { display: none !important; }
+  /* Center and size printable content */
+  .printable { display: block !important; position: static !important; width: 190mm !important; max-width: 190mm !important; margin: 0 auto !important; box-shadow: none !important; background: #fff !important; transform: none !important; }
+  html, body { height: auto !important; }
   body {
-    color: #000 !important;
-    background: #fff !important;
-    font-size: 12pt !important;
-    line-height: 1.5 !important;
+    color: #000 !important; background: #fff !important; font-size: 14pt !important; line-height: 1.5 !important;
   }
+  /* Remove scrollbars and force visible content */
+  .overflow-auto, .overflow-y-auto, .overflow-x-auto, .app-container { overflow: visible !important; }
+  *::-webkit-scrollbar { display: none !important; }
+  * { scrollbar-width: none !important; }
   @page {
     size: A4;
     margin: 10mm;
   }
 }
+
+/* Print view isolation */
+body.print-view * { visibility: hidden !important; }
+body.print-view .printable, body.print-view .printable * { visibility: visible !important; }
+body.print-view .printable { position: static !important; width: 190mm !important; max-width: 190mm !important; margin: 0 auto !important; }

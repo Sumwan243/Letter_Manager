@@ -21,7 +21,7 @@ export default function Letters() {
   const [editingLetter, setEditingLetter] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [previewFontFamily, setPreviewFontFamily] = useState('sans');
-  const [previewFontSize, setPreviewFontSize] = useState(16);
+  const [previewFontSize, setPreviewFontSize] = useState(20);
   // (reverted) keep original send flow; no status filter
   const [sendModalOpen, setSendModalOpen] = useState(false);
   const [sendTargetLetter, setSendTargetLetter] = useState(null);
@@ -548,7 +548,7 @@ export default function Letters() {
                         </div>
                         <div>
                           <label className="block text-xs text-gray-600 dark:text-gray-300 mb-1">Font size: {previewFontSize}px</label>
-                          <input type="range" min={12} max={20} value={previewFontSize} onChange={(e) => setPreviewFontSize(Number(e.target.value))} className="w-full" />
+                          <input type="range" min={12} max={24} value={previewFontSize} onChange={(e) => setPreviewFontSize(Number(e.target.value))} className="w-full" />
                         </div>
                         <div className="flex justify-end gap-2">
                           <button
@@ -576,7 +576,18 @@ export default function Letters() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => window.print()}
+                  onClick={() => {
+                    try {
+                      document.body.classList.add('print-view');
+                      const cleanup = () => document.body.classList.remove('print-view');
+                      // Cleanup after print
+                      const prev = window.onafterprint;
+                      window.onafterprint = () => { cleanup(); if (typeof prev === 'function') prev(); };
+                      window.print();
+                      // Fallback cleanup in case onafterprint doesn't fire
+                      setTimeout(cleanup, 1500);
+                    } catch {}
+                  }}
                   className="btn btn-primary"
                 >
                   <span className="inline-flex items-center gap-2">
@@ -601,12 +612,12 @@ export default function Letters() {
                 className={`mx-auto bg-white text-gray-900 shadow-lg print:shadow-none printable font-scale ${previewFontFamily === 'serif' ? 'font-serif' : previewFontFamily === 'mono' ? 'font-mono' : 'font-sans'}`}
                 style={{ 
                   width: '210mm', 
-                  minHeight: 'auto', 
-                  padding: '20mm',
+                  minHeight: '297mm', 
+                  padding: '22mm',
                   boxSizing: 'border-box',
                   backgroundColor: 'white',
                   fontSize: `${previewFontSize}px`,
-                  lineHeight: 1.6
+                  lineHeight: 1.7
                 }}
               >
 
@@ -632,8 +643,8 @@ export default function Letters() {
                         {/* Header: Logo + University Name */}
                         <div className="text-center">
                           {companyLogo && (
-                            <div className="mb-3">
-                              <img src={companyLogo} alt="Company Logo" className="mx-auto h-16 w-auto object-contain" />
+                            <div className="mb-4">
+                              <img src={companyLogo} alt="Company Logo" className="mx-auto h-24 w-auto object-contain" />
                             </div>
                           )}
                           <div className="uppercase font-bold" style={{ fontSize: '24px' }}>JIMMA UNIVERSITY</div>
@@ -794,7 +805,7 @@ export default function Letters() {
                                 <img
                                   src={fields.company_logo}
                                   alt="Company Logo"
-                                  className="h-16 w-auto object-contain"
+                                  className="h-20 w-auto object-contain"
                                 />
                               )}
                               <div>

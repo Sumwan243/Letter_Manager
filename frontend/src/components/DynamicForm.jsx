@@ -108,9 +108,8 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
 
   useEffect(() => {
     const loadStaff = async () => {
-      if (!selectedDept) { setStaffList([]); return; }
       try {
-        const res = await fetchStaff(selectedDept);
+        const res = await fetchStaff(selectedDept || undefined);
         setStaffList(res.data || []);
       } catch (e) {
         console.error('Failed to load staff', e);
@@ -292,53 +291,10 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
         <h3 className="text-lg font-medium text-gray-900 dark:text-white">
           {editMode ? 'Edit' : 'Create'} {letterType.name} - Letter Details
         </h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          {editMode ? 'Update the letter information below' : letterType.description || 'Fill in the required information for your letter'}
-        </p>
-
-        {isStaffType && (
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Department</label>
-              <select
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                value={selectedDept}
-                onChange={async (e) => { setSelectedDept(e.target.value); setSelectedStaff(''); }}
-              >
-                <option value="">Select Department</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Staff</label>
-              <select
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                value={selectedStaff}
-                onChange={(e) => {
-                  const staffId = e.target.value;
-                  setSelectedStaff(staffId);
-                  const s = staff.find(x => String(x.id) === String(staffId));
-                  if (s) {
-                    setFormData(prev => ({
-                      ...prev,
-                      recipient_name: s.name,
-                      recipient: s.name,
-                      recipient_company: s.department?.name || '',
-                      sender_position: s.position || prev.sender_position || '',
-                    }));
-                  }
-                }}
-                disabled={!selectedDept}
-              >
-                <option value="">Select Staff</option>
-                {staff.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name} — {s.position}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+        {!isStaffType && (
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            {editMode ? 'Update the letter information below' : letterType.description || 'Fill in the required information for your letter'}
+          </p>
         )}
       </div>
 
@@ -347,24 +303,29 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {fields.map((field, index) => {
             // Replace specific fields with dropdowns for Staff template
-            if (isStaffType && (field.name === 'department_name' || field.name === 'recipient_company')) {
+            if (isStaffType && (field.name === 'department_name')) {
               return (
                 <div key={field.id || `${field.name}-${index}` }>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Department</label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    value={selectedDept}
-                    onChange={(e) => {
-                      setSelectedDept(e.target.value);
-                      setSelectedStaff('');
-                      setFormData(prev => ({ ...prev, department_name: departments.find(d => String(d.id) === String(e.target.value))?.name || '', recipient_company: departments.find(d => String(d.id) === String(e.target.value))?.name || '' }));
-                    }}
-                  >
-                    <option value="">Select Department</option>
-                    {departments.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <select
+                      className="w-full pr-10 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white appearance-none"
+                      value={selectedDept}
+                      onChange={(e) => {
+                        setSelectedDept(e.target.value);
+                        setSelectedStaff('');
+                        setFormData(prev => ({ ...prev, department_name: departments.find(d => String(d.id) === String(e.target.value))?.name || '' }));
+                      }}
+                    >
+                      <option value="">Select Department</option>
+                      {departments.map((d) => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                    <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.24 4.38a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                    </svg>
+                  </div>
                 </div>
               );
             }
@@ -373,29 +334,33 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
               return (
                 <div key={field.id || `${field.name}-${index}` }>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Recipient</label>
-                  <select
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                    value={selectedStaff}
-                    onChange={(e) => {
-                      const staffId = e.target.value;
-                      setSelectedStaff(staffId);
-                      const s = staff.find(x => String(x.id) === String(staffId));
-                      if (s) {
-                        setFormData(prev => ({
-                          ...prev,
-                          recipient_name: s.name,
-                          recipient: s.name,
-                          recipient_company: s.department?.name || prev.recipient_company || '',
-                        }));
-                      }
-                    }}
-                    disabled={!selectedDept}
-                  >
-                    <option value="">Select Staff</option>
-                    {staff.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <select
+                      className="w-full pr-10 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white appearance-none"
+                      value={selectedStaff}
+                      onChange={(e) => {
+                        const staffId = e.target.value;
+                        setSelectedStaff(staffId);
+                        const s = staff.find(x => String(x.id) === String(staffId));
+                        if (s) {
+                          setFormData(prev => ({
+                            ...prev,
+                            recipient_name: s.name,
+                            recipient: s.name,
+                            recipient_company: s.department?.name || prev.recipient_company || '',
+                          }));
+                        }
+                      }}
+                    >
+                      <option value="">Select Staff</option>
+                      {staff.map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                    <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.24 4.38a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                    </svg>
+                  </div>
                 </div>
               );
             }

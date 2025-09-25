@@ -33,7 +33,7 @@ export default function Sidebar({ role }) {
   };
 
   return (
-    <div className={`${collapsed ? 'w-16' : 'w-64'} bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-all duration-200`}> 
+    <div className={`${collapsed ? 'w-16' : 'w-64'} bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-all duration-200 no-print`}> 
       <div className="p-4 flex items-center justify-between">
         <div className={`text-xl font-bold text-blue-600 dark:text-blue-400 ${collapsed ? 'sr-only' : ''}`}>Letter Manager</div>
         <button
