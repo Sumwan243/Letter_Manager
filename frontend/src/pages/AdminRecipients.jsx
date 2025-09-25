@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchDepartments, createDepartment } from '../api/departments';
-import { fetchStaff, createStaff } from '../api/staff';
+import { fetchStaff, createStaff, deleteStaff } from '../api/staff';
 import Sidebar from '../components/Sidebar';
 
 export default function AdminRecipients() {
@@ -143,6 +143,7 @@ export default function AdminRecipients() {
                     <th className="text-left p-3 text-gray-700 dark:text-gray-200">Name</th>
                     <th className="text-left p-3 text-gray-700 dark:text-gray-200">Position</th>
                     <th className="text-left p-3 text-gray-700 dark:text-gray-200">Department</th>
+                    <th className="text-left p-3 text-gray-700 dark:text-gray-200">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800">
@@ -151,6 +152,14 @@ export default function AdminRecipients() {
                       <td className="p-3 text-gray-900 dark:text-gray-100">{s.name}</td>
                       <td className="p-3 text-gray-900 dark:text-gray-100">{s.position}</td>
                       <td className="p-3 text-gray-900 dark:text-gray-100">{s.department?.name || ''}</td>
+                      <td className="p-3">
+                        <button
+                          onClick={async () => { if (confirm('Delete this staff member?')) { await deleteStaff(s.id); await loadData(); } }}
+                          className="px-3 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded-full hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Head, Link, usePage } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
-import { Button } from '@/components/ui/button';
 
 interface LetterType { id: number; name: string }
 interface User { id: number; name: string }
@@ -39,14 +38,13 @@ export default function LetterShow() {
   return (
     <AppLayout>
       <Head title={letter?.title ?? 'Letter'} />
-      <div className="mb-4 flex items-center justify-between no-print">
+      <div className="mb-4">
         <Link href="/letters" className="text-sm text-primary-600">← Back to letters</Link>
-        <Button onClick={() => window.print()} size="sm">Print</Button>
       </div>
       {loading ? (
         <div>Loading...</div>
       ) : letter ? (
-        <div className="space-y-4 printable">
+        <div className="space-y-4">
           <h1 className="text-2xl font-semibold text-gray-900">{letter.title}</h1>
           <div className="text-sm text-gray-500">
             {letter.letterType?.name ?? 'Unknown type'} · {new Date(letter.created_at).toLocaleString()}

@@ -345,21 +345,77 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
       {/* Letter Fields */}
       {fields.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {fields.map((field, index) => (
-            <div key={field.id || `${field.name}-${index}` } className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
-              <label htmlFor={field.name} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {getFieldLabel(field.name)}
-              </label>
+          {fields.map((field, index) => {
+            // Replace specific fields with dropdowns for Staff template
+            if (isStaffType && (field.name === 'department_name' || field.name === 'recipient_company')) {
+              return (
+                <div key={field.id || `${field.name}-${index}` }>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Department</label>
+                  <select
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    value={selectedDept}
+                    onChange={(e) => {
+                      setSelectedDept(e.target.value);
+                      setSelectedStaff('');
+                      setFormData(prev => ({ ...prev, department_name: departments.find(d => String(d.id) === String(e.target.value))?.name || '', recipient_company: departments.find(d => String(d.id) === String(e.target.value))?.name || '' }));
+                    }}
+                  >
+                    <option value="">Select Department</option>
+                    {departments.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
+                </div>
+              );
+            }
 
-              {renderField(field)}
+            if (isStaffType && (field.name === 'recipient_name' || field.name === 'recipient')) {
+              return (
+                <div key={field.id || `${field.name}-${index}` }>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Recipient</label>
+                  <select
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    value={selectedStaff}
+                    onChange={(e) => {
+                      const staffId = e.target.value;
+                      setSelectedStaff(staffId);
+                      const s = staff.find(x => String(x.id) === String(staffId));
+                      if (s) {
+                        setFormData(prev => ({
+                          ...prev,
+                          recipient_name: s.name,
+                          recipient: s.name,
+                          recipient_company: s.department?.name || prev.recipient_company || '',
+                        }));
+                      }
+                    }}
+                    disabled={!selectedDept}
+                  >
+                    <option value="">Select Staff</option>
+                    {staff.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              );
+            }
 
-              {field.description && (
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  {field.description}
-                </p>
-              )}
-            </div>
-          ))}
+            return (
+              <div key={field.id || `${field.name}-${index}` } className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
+                <label htmlFor={field.name} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  {getFieldLabel(field.name)}
+                </label>
+
+                {renderField(field)}
+
+                {field.description && (
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {field.description}
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 

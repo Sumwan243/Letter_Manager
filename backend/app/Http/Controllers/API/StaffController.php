@@ -28,6 +28,12 @@ class StaffController extends Controller
         $staff = Staff::create($validated);
         return response()->json(['staff' => $staff->load('department')], 201);
     }
+
+    public function destroy(Staff $staff)
+    {
+        $staff->delete();
+        return response()->json(['message' => 'Staff deleted']);
+    }
 }
 
 

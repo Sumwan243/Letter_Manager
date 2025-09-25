@@ -41,6 +41,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Staff
     Route::get('/staff', [StaffController::class, 'index']); // accepts ?department_id=
     Route::post('/staff', [StaffController::class, 'store']);
+    Route::delete('/staff/{staff}', [StaffController::class, 'destroy']);
 
     // Profile
     Route::post('/profile', [UserController::class, 'updateProfile']);
