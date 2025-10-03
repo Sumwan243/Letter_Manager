@@ -11,7 +11,7 @@ export default defineConfig({
     alias: {
       react: resolve(__dirname, 'node_modules/react'),
       'react-dom': resolve(__dirname, 'node_modules/react-dom'),
-      'ziggy-js': resolve(__dirname, '../vendor/tightenco/ziggy'), // updated relative path after folder move
+      'ziggy-js': resolve(__dirname, '../backend/vendor/tightenco/ziggy'),
     },
   },
 

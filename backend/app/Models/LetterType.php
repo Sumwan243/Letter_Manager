@@ -13,11 +13,13 @@ class LetterType extends Model
         'name',
         'description',
         'template_fields',
+        'allowed_roles',
         'is_active',
     ];
 
     protected $casts = [
         'template_fields' => 'array',
+        'allowed_roles' => 'array',
         'is_active' => 'boolean',
     ];
 

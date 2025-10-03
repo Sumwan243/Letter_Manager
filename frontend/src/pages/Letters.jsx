@@ -60,8 +60,18 @@ export default function Letters() {
         console.log('API Response for letter types:', response);
 
         if (response.data && Array.isArray(response.data) && response.data.length > 0) {
-          setLetterTypes(response.data);
-          console.log('Loaded letter types from API:', response.data.length);
+          // Filter letter types based on user role
+          const filteredTypes = response.data.filter(type => {
+            // If no allowed_roles specified, show to everyone
+            if (!type.allowed_roles || type.allowed_roles.length === 0) {
+              return true;
+            }
+            // Check if user's role is in the allowed roles
+            return type.allowed_roles.includes(user?.role);
+          });
+          
+          setLetterTypes(filteredTypes);
+          console.log('Loaded letter types from API:', filteredTypes.length, 'accessible to', user?.role);
         } else {
           console.log('API returned no data');
           setLetterTypes([]);
@@ -74,8 +84,10 @@ export default function Letters() {
       }
     };
 
-    loadLetterTypes();
-  }, []);
+    if (user) {
+      loadLetterTypes();
+    }
+  }, [user]);
 
   // --- Load Letters ---
   useEffect(() => {
@@ -333,10 +345,17 @@ export default function Letters() {
         {/* Header */}
         <div className="mb-8">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 border border-gray-100 dark:border-gray-700">
-            <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Letter Management System 📝</h1>
-            <p className="text-gray-600 dark:text-gray-300 text-lg mt-2">
-              {user?.role === 'admin' ? 'Manage and oversee all letters across the organization' : 'Create and manage your letters'}
-            </p>
+            <div className="flex items-center gap-3">
+              <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Letter Management</h1>
+                <p className="text-gray-600 dark:text-gray-300 text-lg mt-1">
+                  {user?.role === 'admin' ? 'Manage and oversee all letters across the organization' : 'Create and manage your letters'}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -358,17 +377,22 @@ export default function Letters() {
             {activeTab === 'view' && (
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">{user?.role === 'admin' ? 'All Letters' : 'My Letters'}</h3>
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white">{user?.role === 'admin' ? 'All Letters' : 'My Letters'}</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Total: {filteredLetters.length} letters</p>
+                  </div>
                   <div className="flex items-center space-x-3">
-                    <div className="text-sm text-gray-500 dark:text-gray-400">Total: {filteredLetters.length} letters</div>
-                    <button onClick={refreshLetters} disabled={refreshing} className="px-3 py-1 text-sm bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200 disabled:opacity-50">
+                    <button onClick={refreshLetters} disabled={refreshing} className="px-4 py-2 text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow">
                       {refreshing ? 'Refreshing...' : 'Refresh'}
                     </button>
                     <button
                       onClick={() => { setEditMode(false); setEditingLetter(null); setSelectedType(''); setActiveTab('create'); }}
-                      className="px-3 py-1 text-sm bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200"
+                      className="px-5 py-2 text-sm font-medium bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-md hover:shadow-lg flex items-center gap-2"
                     >
-                      + New Letter
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      New Letter
                     </button>
                   </div>
                 </div>
@@ -378,21 +402,35 @@ export default function Letters() {
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
                   </div>
                 ) : filteredLetters.length === 0 ? (
-                  <div className="text-center py-8">
-                    <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No letters found</h3>
-                    <button onClick={() => setActiveTab('create')} className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Create Your First Letter</button>
+                  <div className="text-center py-12">
+                    <svg className="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">No letters found</h3>
+                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Get started by creating your first letter</p>
+                    <button onClick={() => setActiveTab('create')} className="mt-6 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-md hover:shadow-lg font-medium">Create Your First Letter</button>
                   </div>
                 ) : (
                   <div className="space-y-8">
                     {/* Drafts */}
                     <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Drafts</h4>
-                        <span className="text-xs text-gray-500">{draftLetters.length}</span>
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                          <svg className="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          Drafts
+                        </h4>
+                        <span className="px-3 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 rounded-full">{draftLetters.length}</span>
                       </div>
                       <div className="space-y-4">
                         {draftLetters.length === 0 && (
-                          <div className="text-sm text-gray-500">No drafts</div>
+                          <div className="text-center py-8 text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                            <svg className="mx-auto h-12 w-12 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <p className="text-sm">No drafts</p>
+                          </div>
                         )}
                         {draftLetters.map(letter => (
                           <div key={letter.id} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200">
@@ -426,13 +464,23 @@ export default function Letters() {
 
                     {/* Sent */}
                     <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Sent</h4>
-                        <span className="text-xs text-gray-500">{sentLetters.length}</span>
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-lg font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                          <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Sent
+                        </h4>
+                        <span className="px-3 py-1 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded-full">{sentLetters.length}</span>
                       </div>
                       <div className="space-y-4">
                         {sentLetters.length === 0 && (
-                          <div className="text-sm text-gray-500">No sent letters</div>
+                          <div className="text-center py-8 text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                            <svg className="mx-auto h-12 w-12 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                            <p className="text-sm">No sent letters</p>
+                          </div>
                         )}
                         {sentLetters.map(letter => (
                           <div key={letter.id} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200">
@@ -471,27 +519,36 @@ export default function Letters() {
             {activeTab === 'create' && (
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
-                  <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-4">
                     <button
                       onClick={() => { setActiveTab('view'); setEditMode(false); setEditingLetter(null); setSelectedType(''); }}
-                      className="px-3 py-1 text-sm bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200"
+                      className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 shadow-sm hover:shadow flex items-center gap-2"
                     >
-                      ← Back to Letters
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                      </svg>
+                      Back to Letters
                     </button>
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white">Create New Letter</h3>
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Create New Letter</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Choose a template and fill in the details</p>
+                    </div>
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                      Select Letter Template
+                    </label>
                     <div className="relative">
                       <select
                         value={selectedType}
                         onChange={(e) => { if (editMode) { setEditMode(false); setEditingLetter(null); } setSelectedType(e.target.value); }}
-                        className="appearance-none w-full px-4 py-3 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        className="appearance-none w-full px-4 py-3 pr-10 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 font-medium"
                       >
                         <option value="" disabled hidden>
-                          Choose Your Letter Style
+                          Choose Your Letter Template
                         </option>
                         {letterTypes.map(type => (
                           <option key={type.id} value={type.id}>{type.name}</option>
@@ -501,6 +558,11 @@ export default function Letters() {
                         <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" /></svg>
                       </div>
                     </div>
+                    {!selectedType && (
+                      <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                        Select a template to get started with your letter
+                      </p>
+                    )}
                   </div>
 
                   {selectedType && (
@@ -523,9 +585,9 @@ export default function Letters() {
 
       {/* Letter View Modal */}
       {viewingLetter && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4 print:static print:bg-transparent print:p-0">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden print:shadow-none print:max-w-none print:max-h-none print:rounded-none print:w-auto">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between no-print">
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4 print:static print:bg-transparent print:p-0 print:block">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden print:shadow-none print:max-w-none print:max-h-none print:rounded-none print:w-auto print:overflow-visible print:bg-transparent">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between no-print print:hidden">
               <div className="flex items-center gap-3">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                   {viewingLetter.title || 'Letter View'}
@@ -606,7 +668,7 @@ export default function Letters() {
               </div>
             </div>
             
-            <div className="p-8 bg-gray-50 dark:bg-gray-800/50 overflow-auto print:p-0" style={{ maxHeight: 'calc(90vh - 120px)' }}>
+            <div className="p-8 bg-gray-50 dark:bg-gray-800/50 overflow-auto print:p-0 print:bg-transparent print:overflow-visible" style={{ maxHeight: 'calc(90vh - 120px)' }}>
               {/* A4 Paper Layout */}
               <div 
                 className={`mx-auto bg-white text-gray-900 shadow-lg print:shadow-none printable font-scale ${previewFontFamily === 'serif' ? 'font-serif' : previewFontFamily === 'mono' ? 'font-mono' : 'font-sans'}`}
@@ -627,85 +689,130 @@ export default function Letters() {
                   const layout = getLetterLayout(viewingLetter.letter_type);
 
                   if (layout === 'staff') {
-                    // Formal Staff Layout - strictly limited fields per spec
+                    // Executive Formal Letter Layout - High-level official correspondence
                     const subjectText = fields.subject || '';
                     const contentText = fields.body || '';
                     const printDate = fields.letter_date || '';
                     const fromText = fields.sender_name || fields.department_name || '';
+                    const senderTitle = fields.sender_position || fields.sender_title || '';
                     const recipientText = fields.recipient_name || fields.recipient || '';
+                    const recipientTitle = fields.recipient_title || fields.recipient_position || '';
                     const refNoText = fields.ref_no || fields.reference_no || '';
                     const phoneText = fields.phone || fields.contact_information || '';
+                    const emailText = fields.email || fields.sender_email || '';
                     const companyLogo = fields.company_logo || '';
                     const signatureImage = fields.signature_image || fields.signature || '';
+                    const organizationName = fields.organization_name || 'JIMMA UNIVERSITY';
+                    const organizationNameLocal = fields.organization_name_local || 'ጅማ ዩኒቨርሲቲ';
 
                     return (
-                      <div style={{ fontFamily: 'Times New Roman, Times, serif' }} className="space-y-6">
-                        {/* Header: Logo + University Name */}
-                        <div className="text-center">
+                      <div style={{ fontFamily: 'Times New Roman, Times, serif' }} className="space-y-8">
+                        {/* Executive Header: Logo + Organization Name */}
+                        <div className="text-center pt-8 pb-6 border-b-2 border-gray-300">
                           {companyLogo && (
-                            <div className="mb-4">
-                              <img src={companyLogo} alt="Company Logo" className="mx-auto h-24 w-auto object-contain" />
+                            <div className="mb-6">
+                              <img src={companyLogo} alt="Organization Logo" className="mx-auto h-36 w-auto object-contain" />
                             </div>
                           )}
-                          <div className="uppercase font-bold" style={{ fontSize: '24px' }}>JIMMA UNIVERSITY</div>
-                          <div className="font-bold" style={{ fontSize: '24px' }}>ጅማ ዩኒቨርሲቲ</div>
+                          <div className="uppercase font-bold mb-2" style={{ fontSize: '32px', letterSpacing: '1px', color: '#1a1a1a' }}>
+                            {organizationName}
+                          </div>
+                          <div className="font-bold mb-3" style={{ fontSize: '30px', color: '#1a1a1a' }}>
+                            {organizationNameLocal}
+                          </div>
+                          {fields.department_name && (
+                            <div className="uppercase font-semibold mt-3" style={{ fontSize: '18px', letterSpacing: '0.5px', color: '#4a4a4a' }}>
+                              {fields.department_name}
+                            </div>
+                          )}
                         </div>
 
-                        {/* From / Ref No / Date */}
-                        <div style={{ fontSize: '18px' }} className="font-bold">
-                          <div className="flex items-start justify-between">
-                            <div>From: {fromText}</div>
-                            <div className="text-right space-y-1">
-                              <div>
-                                Ref No: <span className="underline underline-offset-2 decoration-gray-700">{refNoText}</span>
+                        {/* Reference Information Block */}
+                        <div className="mt-10">
+                          <div className="grid grid-cols-2 gap-4" style={{ fontSize: '18px' }}>
+                            <div>
+                              <div className="flex gap-2">
+                                <span className="font-bold">From:</span>
+                                <div>
+                                  <div className="font-semibold">{fromText}</div>
+                                  {senderTitle && (
+                                    <div className="text-gray-700 italic">{senderTitle}</div>
+                                  )}
+                                </div>
                               </div>
-                              <div>
-                                Date: <span className="underline underline-offset-2 decoration-gray-700">{printDate}</span>
+                            </div>
+                            <div className="text-right">
+                              <div className="space-y-2">
+                                <div>
+                                  <span className="font-bold">Ref No:</span>{' '}
+                                  <span className="font-mono underline underline-offset-2 decoration-gray-700">{refNoText}</span>
+                                </div>
+                                <div>
+                                  <span className="font-bold">Date:</span>{' '}
+                                  <span className="underline underline-offset-2 decoration-gray-700">{printDate}</span>
+                                </div>
                               </div>
                             </div>
                           </div>
                         </div>
 
-                        {/* Recipient (TO) */}
+                        {/* Recipient Information */}
                         {recipientText && (
-                          <div style={{ fontSize: '16px' }}>
-                            <span className="font-bold">To:</span>{' '}<em>{recipientText}</em>
+                          <div className="mt-8" style={{ fontSize: '18px' }}>
+                            <div className="flex gap-2">
+                              <span className="font-bold">To:</span>
+                              <div>
+                                <div className="font-semibold">{recipientText}</div>
+                                {recipientTitle && (
+                                  <div className="text-gray-700 italic">{recipientTitle}</div>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         )}
 
-                        {/* Subject */}
+                        {/* Subject Line - Prominent */}
                         {subjectText && (
-                          <div className="mt-2" style={{ fontSize: '16px' }}>
-                            <span className="font-bold">Subject:</span>{' '}
-                            <span className="underline underline-offset-2 decoration-gray-700">{subjectText}</span>
+                          <div className="mt-8 pt-6 border-t border-gray-200" style={{ fontSize: '18px' }}>
+                            <div className="font-semibold uppercase" style={{ letterSpacing: '0.3px' }}>
+                              {subjectText}
+                            </div>
                           </div>
                         )}
 
-                        {/* Body */}
+                        {/* Letter Body - Executive Style */}
                         {contentText && (
-                          <div className="text-justify" style={{ fontSize: '16px', lineHeight: 1.5 }}>
-                            <p className="whitespace-pre-wrap">{contentText}</p>
+                          <div className="text-justify mt-8" style={{ fontSize: '17px', lineHeight: 1.7 }}>
+                            <p className="whitespace-pre-wrap leading-relaxed">{contentText}</p>
                           </div>
                         )}
 
-                        {/* Closing */}
-                        <div className="space-y-2" style={{ fontSize: '16px' }}>
-                          <div>Kind Regards,</div>
-                          {fields.sender_name && (
-                            <div className="font-medium">{fields.sender_name}</div>
-                          )}
-                          {phoneText && (
-                            <div className="text-gray-700">{phoneText}</div>
-                          )}
-                          {/* Signature Area */}
-                          <div className="mt-6">
-                            {signatureImage ? (
-                              <img src={signatureImage} alt="Signature" className="h-16 w-auto object-contain" />
-                            ) : (
-                              <div className="border-t border-gray-400 w-48" />
-                            )}
-                          </div>
+                        {/* Professional Closing */}
+                        <div className="mt-12" style={{ fontSize: '17px' }}>
+                          <div className="font-medium">{fields.closing_salutation || 'Respectfully yours'},</div>
                         </div>
+
+                        {/* Spacer to push footer to bottom */}
+                        <div className="flex-grow" style={{ minHeight: '200px' }}></div>
+
+                        {/* Footer with Signature and Phone at Bottom */}
+                        {(signatureImage || phoneText) && (
+                          <div className="mt-auto pt-4 border-t border-gray-300">
+                            <div className="flex justify-between items-end">
+                              {signatureImage && (
+                                <div>
+                                  <div className="mb-2">
+                                    <img src={signatureImage} alt="Signature" className="h-20 w-auto object-contain" />
+                                  </div>
+                                  <div className="border-t-2 border-gray-800 w-48" />
+                                </div>
+                              )}
+                              {phoneText && (
+                                <div className="text-sm text-gray-600 ml-auto">Tel: {phoneText}</div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   }
@@ -723,39 +830,39 @@ export default function Letters() {
                       return (
                         <>
                           {/* Header with optional logo and name on the left; address below; date on the right */}
-                          <div className="flex justify-between items-start mb-8">
+                          <div className="flex justify-between items-start mb-10 pt-4">
                             <div className="flex-1">
                               <div className="flex items-center space-x-4">
                                 {fieldsInner.company_logo && (
                                   <img
                                     src={fieldsInner.company_logo}
                                     alt="Company Logo"
-                                    className="h-16 w-auto object-contain"
+                                    className="h-24 w-auto object-contain"
                                   />
                                 )}
                                 {(fieldsInner.company_name || fieldsInner.sender_company) && (
-                                  <h2 className="text-xl font-bold text-gray-900">
+                                  <h2 className="text-2xl font-bold text-gray-900">
                                     {fieldsInner.company_name || fieldsInner.sender_company}
                                   </h2>
                                 )}
                               </div>
                               {/* Address below the logo/name to avoid cramping */}
-                              <div className="mt-2">
+                              <div className="mt-3">
                                 {fieldsInner.address_line1 && (
-                                  <p className="text-sm text-gray-600">{fieldsInner.address_line1}</p>
+                                  <p className="text-base text-gray-600">{fieldsInner.address_line1}</p>
                                 )}
                                 {fieldsInner.address_line2 && (
-                                  <p className="text-sm text-gray-600">{fieldsInner.address_line2}</p>
+                                  <p className="text-base text-gray-600">{fieldsInner.address_line2}</p>
                                 )}
                                 {(fieldsInner.city || fieldsInner.state || fieldsInner.zip_code) && (
-                                  <p className="text-sm text-gray-600">
+                                  <p className="text-base text-gray-600">
                                     {[fieldsInner.city, fieldsInner.state].filter(Boolean).join(', ')}{(fieldsInner.city || fieldsInner.state) && fieldsInner.zip_code ? ` ${fieldsInner.zip_code}` : fieldsInner.zip_code || ''}
                                   </p>
                                 )}
                               </div>
                             </div>
                             <div className="text-right">
-                              <p className="text-sm text-gray-600">
+                              <p className="text-base text-gray-600">
                                 {viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', {
                                   year: 'numeric',
                                   month: 'long',
@@ -771,18 +878,18 @@ export default function Letters() {
                       return (
                         <>
                           {/* Personal Letter Header */}
-                          <div className="mb-8">
+                          <div className="mb-10 pt-4">
                             <div className="flex justify-between items-start">
                               <div>
-                                <h2 className="text-xl font-bold text-gray-900 mb-1">
+                                <h2 className="text-2xl font-bold text-gray-900 mb-2">
                                   {fields.sender_name || 'Your Name'}
                                 </h2>
                                 {fields.sender_address && (
-                                  <p className="text-sm text-gray-600 whitespace-pre-line">{fields.sender_address}</p>
+                                  <p className="text-base text-gray-600 whitespace-pre-line">{fields.sender_address}</p>
                                 )}
                               </div>
                               <div className="text-right">
-                                <p className="text-sm text-gray-600">
+                                <p className="text-base text-gray-600">
                                   {fields.letter_date || (viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', { 
                                     year: 'numeric', 
                                     month: 'long', 
@@ -799,34 +906,34 @@ export default function Letters() {
                       return (
                         <>
                           {/* Header with optional logo on the left and date on the right */}
-                          <div className="flex justify-between items-start mb-8">
+                          <div className="flex justify-between items-start mb-10 pt-4">
                             <div className="flex items-start space-x-4 flex-1">
                               {fields.company_logo && (
                                 <img
                                   src={fields.company_logo}
                                   alt="Company Logo"
-                                  className="h-20 w-auto object-contain"
+                                  className="h-24 w-auto object-contain"
                                 />
                               )}
                               <div>
-                                <h2 className="text-xl font-bold text-gray-900 mb-1">
+                                <h2 className="text-2xl font-bold text-gray-900 mb-2">
                                   {fields.company_name || fields.sender_company || ''}
                                 </h2>
                                 {fields.address_line1 && (
-                                  <p className="text-sm text-gray-600">{fields.address_line1}</p>
+                                  <p className="text-base text-gray-600">{fields.address_line1}</p>
                                 )}
                                 {fields.address_line2 && (
-                                  <p className="text-sm text-gray-600">{fields.address_line2}</p>
+                                  <p className="text-base text-gray-600">{fields.address_line2}</p>
                                 )}
                                 {(fields.city || fields.state || fields.zip_code) && (
-                                  <p className="text-sm text-gray-600">
+                                  <p className="text-base text-gray-600">
                                     {[fields.city, fields.state].filter(Boolean).join(', ')}{(fields.city || fields.state) && fields.zip_code ? ` ${fields.zip_code}` : fields.zip_code || ''}
                                   </p>
                                 )}
                               </div>
                             </div>
                             <div className="text-right">
-                              <p className="text-sm text-gray-600">
+                              <p className="text-base text-gray-600">
                                 {viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', {
                                   year: 'numeric',
                                   month: 'long',
@@ -849,8 +956,8 @@ export default function Letters() {
                     for (const fieldName of titleFields) {
                       if (fields[fieldName]) {
                         return (
-                          <div className="mt-6 mb-4">
-                            <h2 className="text-lg font-semibold text-gray-900 text-center">
+                          <div className="mt-8 mb-6">
+                            <h2 className="text-xl font-semibold text-gray-900 text-center">
                               {fields[fieldName]}
                             </h2>
                           </div>
@@ -861,8 +968,8 @@ export default function Letters() {
                     // Fallback to main title field
                     if (viewingLetter.title) {
                       return (
-                        <div className="mt-6 mb-4">
-                          <h2 className="text-lg font-semibold text-gray-900 text-center">
+                        <div className="mt-8 mb-6">
+                          <h2 className="text-xl font-semibold text-gray-900 text-center">
                             {viewingLetter.title}
                           </h2>
                         </div>
@@ -872,56 +979,52 @@ export default function Letters() {
                     return null;
                   })()}
 
-                  {/* Recipient Address */}
-                  <div className="mt-8 mb-6">
-                    <div className="text-sm text-gray-700 font-medium">
-                      {(() => {
-                        const fields = viewingLetter.fields || {};
-                        const typeName = viewingLetter.letter_type?.name?.toLowerCase() || '';
-                        
-                        const layout = getLetterLayout(viewingLetter.letter_type);
-                        if (layout === 'executive') {
-                          return fields.recipient_name || fields.recipient_company || 'Client/Partner';
-                        }
-                        if (layout === 'staff') {
-                          return fields.recipient_name || fields.recipient_company || 'Client';
-                        }
-                        if (layout === 'informal') {
-                          return fields.recipient_name || 'Recipient';
-                        }
-                        return fields.recipient_name || fields.recipient || fields.to || 'Not specified';
-                      })()}
+                  {/* To: Recipient */}
+                  <div className="mt-8 mb-8" style={{ fontSize: '18px' }}>
+                    <div className="flex gap-2">
+                      <span className="font-bold">To:</span>
+                      <div>
+                        <div className="font-semibold">
+                          {(() => {
+                            const fields = viewingLetter.fields || {};
+                            const layout = getLetterLayout(viewingLetter.letter_type);
+                            if (layout === 'executive') {
+                              return fields.recipient_name || fields.recipient_company || 'Client/Partner';
+                            }
+                            if (layout === 'staff') {
+                              return fields.recipient_name || fields.recipient_company || 'Client';
+                            }
+                            if (layout === 'informal') {
+                              return fields.recipient_name || 'Recipient';
+                            }
+                            return fields.recipient_name || fields.recipient || fields.to || 'Not specified';
+                          })()}
+                        </div>
+                        {viewingLetter.fields?.recipient_title && (
+                          <div className="text-gray-700 italic">{viewingLetter.fields.recipient_title}</div>
+                        )}
+                        {viewingLetter.fields?.recipient_company && (
+                          <div className="text-gray-700">{viewingLetter.fields.recipient_company}</div>
+                        )}
+                        {viewingLetter.fields?.recipient_address && (
+                          <div className="text-gray-700 whitespace-pre-line">{viewingLetter.fields.recipient_address}</div>
+                        )}
+                      </div>
                     </div>
-                    {viewingLetter.fields?.recipient_title && (
-                      <div className="text-sm text-gray-700">{viewingLetter.fields.recipient_title}</div>
-                    )}
-                    {viewingLetter.fields?.recipient_company && (
-                      <div className="text-sm text-gray-700">{viewingLetter.fields.recipient_company}</div>
-                    )}
-                    {viewingLetter.fields?.recipient_address && (
-                      <div className="text-sm text-gray-700 whitespace-pre-line">{viewingLetter.fields.recipient_address}</div>
-                    )}
-                  </div>
-
-                  {/* Salutation */}
-                  <div className="mb-4">
-                    <p className="text-sm text-gray-700">
-                      Dear {viewingLetter.fields?.recipient_name || viewingLetter.fields?.recipient || 'Sir/Madam'},
-                    </p>
                   </div>
 
                   {/* Subject Line */}
                   {viewingLetter.fields?.subject && (
-                    <div className="mt-4 mb-4">
-                      <p className="text-sm font-semibold text-gray-900">
-                        Subject: {viewingLetter.fields.subject}
-                      </p>
+                    <div className="mt-8 pt-6 border-t border-gray-200" style={{ fontSize: '18px' }}>
+                      <div className="font-semibold uppercase" style={{ letterSpacing: '0.3px' }}>
+                        {viewingLetter.fields.subject}
+                      </div>
                     </div>
                   )}
 
                   {/* Letter Body */}
-                  <div className="mt-4">
-                    <div className="text-sm text-gray-700 leading-relaxed">
+                  <div className="mt-6">
+                    <div className="text-base text-gray-700 leading-relaxed">
                       <p className="whitespace-pre-wrap">
                         {(() => {
                           const fields = viewingLetter.fields || {};
@@ -942,21 +1045,31 @@ export default function Letters() {
                   </div>
 
                   {/* Closing */}
-                  <div className="mt-8">
-                    <p className="text-sm text-gray-700 mb-4">Sincerely,</p>
-                    <div className="text-sm text-gray-700 font-medium">
-                      {viewingLetter.fields?.sender_name || viewingLetter.user?.name || 'Your Name'}
-                    </div>
-                    {viewingLetter.fields?.sender_position && (
-                      <div className="text-sm text-gray-700">{viewingLetter.fields.sender_position}</div>
-                    )}
-                    {viewingLetter.fields?.sender_company && (
-                      <div className="text-sm text-gray-700">{viewingLetter.fields.sender_company}</div>
-                    )}
-                    {viewingLetter.fields?.contact_information && (
-                      <div className="text-sm text-gray-600 mt-2">{viewingLetter.fields.contact_information}</div>
-                    )}
+                  <div className="mt-12" style={{ fontSize: '17px' }}>
+                    <div className="font-medium">{viewingLetter.fields?.closing_salutation || 'Sincerely'},</div>
                   </div>
+
+                  {/* Spacer to push footer to bottom */}
+                  <div className="flex-grow" style={{ minHeight: '200px' }}></div>
+
+                  {/* Footer with Signature and Phone at Bottom */}
+                  {(viewingLetter.fields?.signature_image || viewingLetter.fields?.phone) && (
+                    <div className="mt-auto pt-4 border-t border-gray-300">
+                      <div className="flex justify-between items-end">
+                        {viewingLetter.fields?.signature_image && (
+                          <div>
+                            <div className="mb-2">
+                              <img src={viewingLetter.fields.signature_image} alt="Signature" className="h-20 w-auto object-contain" />
+                            </div>
+                            <div className="border-t-2 border-gray-800 w-48" />
+                          </div>
+                        )}
+                        {viewingLetter.fields?.phone && (
+                          <div className="text-sm text-gray-600 ml-auto">Tel: {viewingLetter.fields.phone}</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
                   );
                 })()}

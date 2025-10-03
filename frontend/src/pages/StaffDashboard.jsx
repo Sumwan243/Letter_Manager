@@ -8,15 +8,29 @@ import { fetchLetters } from "../api/letters";
 export default function StaffDashboard() {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
-  const [recentLetters, setRecentLetters] = useState([]);
+  const [letters, setLetters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [letterToDelete, setLetterToDelete] = useState(null);
+  
+  // Calculate stats
+  const stats = {
+    total: letters.length,
+    draft: letters.filter(l => l.status === 'draft').length,
+    pending: letters.filter(l => l.status === 'pending').length,
+    approved: letters.filter(l => l.status === 'approved').length,
+    thisMonth: letters.filter(l => {
+      const letterDate = new Date(l.created_at);
+      const now = new Date();
+      return letterDate.getMonth() === now.getMonth() && 
+             letterDate.getFullYear() === now.getFullYear();
+    }).length
+  };
 
   // Handler functions for buttons
   const handleCreateLetter = () => {
-    navigate('/letters/new');
+    navigate('/letters'); // Go to Letters page (will default to create tab)
   };
 
   const handleViewLetters = () => {
@@ -143,31 +157,52 @@ Sincerely,
     }
   };
 
-  // Fetch recent letters from Laravel backend
+  // Fetch letters from Laravel backend
   useEffect(() => {
-    const loadRecentLetters = async () => {
+    const loadLetters = async () => {
       try {
         setLoading(true);
         const response = await fetchLetters();
-        // Filter letters for current user and get the 3 most recent
+        // Filter letters for current user
         const userLetters = response.data.filter(letter => 
           letter.user_id === user?.id
         );
-        const sortedLetters = userLetters
-          .sort((a, b) => new Date(b.created_at || b.createdAt) - new Date(a.created_at || a.createdAt))
-          .slice(0, 3);
-        setRecentLetters(sortedLetters);
+        setLetters(userLetters);
       } catch (error) {
-        console.error('Error fetching recent letters:', error);
-        setRecentLetters([]);
+        console.error('Error fetching letters:', error);
+        setLetters([]);
       } finally {
         setLoading(false);
       }
     };
 
     if (user) {
-      loadRecentLetters();
+      loadLetters();
     }
+  }, [user]);
+
+  // Reload letters when component becomes visible (user returns to dashboard)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && user) {
+        // Reload letters when tab becomes visible
+        const reloadLetters = async () => {
+          try {
+            const response = await fetchLetters();
+            const userLetters = response.data.filter(letter => 
+              letter.user_id === user?.id
+            );
+            setLetters(userLetters);
+          } catch (error) {
+            console.error('Error reloading letters:', error);
+          }
+        };
+        reloadLetters();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [user]);
 
   const getStatusColor = (status) => {
@@ -214,113 +249,139 @@ Sincerely,
         </div>
 
         {/* Quick Actions Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div
             onClick={handleCreateLetter}
-            className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300 cursor-pointer hover:border-blue-300 dark:hover:border-blue-600"
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300 cursor-pointer hover:border-blue-300 dark:hover:border-blue-600"
           >
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-center space-x-4">
+              <div className="w-14 h-14 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                <svg className="w-8 h-8 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Create New Letter</h3>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">Draft and submit new letters</p>
+                <h3 className="text-xl font-semibold text-gray-800 dark:text-white">Create New Letter</h3>
+                <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">Draft and submit new letters</p>
               </div>
             </div>
           </div>
 
           <div
             onClick={handleViewLetters}
-            className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300 cursor-pointer hover:border-green-300 dark:hover:border-green-600"
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300 cursor-pointer hover:border-green-300 dark:hover:border-green-600"
           >
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-center space-x-4">
+              <div className="w-14 h-14 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
+                <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-800 dark:text-white">My Letters</h3>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">View and manage your letters</p>
-              </div>
-            </div>
-          </div>
-
-          <div
-            onClick={handleViewTemplates}
-            className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-100 dark:border-gray-700 hover:shadow-xl transition-all duration-300 cursor-pointer hover:border-purple-300 dark:hover:border-purple-600"
-          >
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM4 19h6v-6H4v6zM4 13h6V7H4v6z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Templates</h3>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">Use letter templates</p>
+                <h3 className="text-xl font-semibold text-gray-800 dark:text-white">My Letters</h3>
+                <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">View and manage your letters</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Recent Letters Section */}
+        {/* Quick Stats Section */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700">
           <div className="p-6 border-b border-gray-100 dark:border-gray-700">
-            <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Recent Letters</h2>
-            <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">Your recently created or updated letters</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Quick Statistics</h2>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">Overview of your letter activity</p>
+                </div>
+              </div>
+              <button
+                onClick={async () => {
+                  setLoading(true);
+                  try {
+                    const response = await fetchLetters();
+                    const userLetters = response.data.filter(letter => letter.user_id === user?.id);
+                    setLetters(userLetters);
+                  } catch (error) {
+                    console.error('Error refreshing:', error);
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                className="px-4 py-2 text-sm font-medium bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh
+              </button>
+            </div>
           </div>
           
           <div className="p-6">
             {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              </div>
-            ) : recentLetters.length === 0 ? (
-              <div className="text-center py-8">
-                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No letters yet</h3>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Get started by creating your first letter.</p>
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
               </div>
             ) : (
-              <div className="space-y-4">
-                {recentLetters.map((letter) => (
-                  <div key={letter.id} className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-200">
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-                        {letter.title || letter.fields?.subject || 'Untitled Letter'}
-                      </h4>
-                      <div className="flex items-center space-x-4 mt-1">
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {letter.letterType?.name || 'Unknown Type'}
-                        </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          To: {letter.fields?.recipient || letter.fields?.to || 'Not specified'}
-                        </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {letter.created_at ? new Date(letter.created_at).toLocaleDateString() : 'Unknown date'}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(letter.status)}`}>
-                        {letter.status || 'Unknown'}
-                      </span>
-                      <button
-                        onClick={() => handleLetterDelete(letter.id)}
-                        className="px-2 py-1 text-xs bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 rounded hover:bg-red-200 dark:hover:bg-red-800 transition-colors duration-200"
-                        title="Delete Letter"
-                      >
-                        🗑️
-                      </button>
-                    </div>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                {/* Total Letters */}
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-xl p-6 border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center justify-between mb-2">
+                    <svg className="w-8 h-8 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
                   </div>
-                ))}
+                  <div className="text-3xl font-bold text-blue-900 dark:text-blue-100">{stats.total}</div>
+                  <div className="text-sm text-blue-700 dark:text-blue-300 mt-1">Total Letters</div>
+                </div>
+
+                {/* Draft Letters */}
+                <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/20 dark:to-gray-700/20 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center justify-between mb-2">
+                    <svg className="w-8 h-8 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </div>
+                  <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">{stats.draft}</div>
+                  <div className="text-sm text-gray-700 dark:text-gray-300 mt-1">Drafts</div>
+                </div>
+
+                {/* Pending Letters */}
+                <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20 rounded-xl p-6 border border-yellow-200 dark:border-yellow-800">
+                  <div className="flex items-center justify-between mb-2">
+                    <svg className="w-8 h-8 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="text-3xl font-bold text-yellow-900 dark:text-yellow-100">{stats.pending}</div>
+                  <div className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">Pending</div>
+                </div>
+
+                {/* Approved Letters */}
+                <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-xl p-6 border border-green-200 dark:border-green-800">
+                  <div className="flex items-center justify-between mb-2">
+                    <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="text-3xl font-bold text-green-900 dark:text-green-100">{stats.approved}</div>
+                  <div className="text-sm text-green-700 dark:text-green-300 mt-1">Approved</div>
+                </div>
+
+                {/* This Month */}
+                <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-xl p-6 border border-purple-200 dark:border-purple-800">
+                  <div className="flex items-center justify-between mb-2">
+                    <svg className="w-8 h-8 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div className="text-3xl font-bold text-purple-900 dark:text-purple-100">{stats.thisMonth}</div>
+                  <div className="text-sm text-purple-700 dark:text-purple-300 mt-1">This Month</div>
+                </div>
               </div>
             )}
           </div>

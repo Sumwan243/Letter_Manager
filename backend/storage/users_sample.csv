@@ -1,0 +1,21 @@
+name,email,password,role
+Admin User,admin@university.edu,password123,admin
+Dr. John Smith,john.smith@university.edu,password123,executive
+Dr. Sarah Johnson,sarah.johnson@university.edu,password123,executive
+Prof. Michael Brown,michael.brown@university.edu,password123,executive
+Dean Emily Davis,emily.davis@university.edu,password123,executive
+Dr. Robert Wilson,robert.wilson@university.edu,password123,executive
+Jane Anderson,jane.anderson@university.edu,password123,staff
+Mark Thompson,mark.thompson@university.edu,password123,staff
+Lisa Martinez,lisa.martinez@university.edu,password123,staff
+David Garcia,david.garcia@university.edu,password123,staff
+Jennifer Rodriguez,jennifer.rodriguez@university.edu,password123,staff
+William Lee,william.lee@university.edu,password123,staff
+Mary Walker,mary.walker@university.edu,password123,staff
+James Hall,james.hall@university.edu,password123,staff
+Patricia Allen,patricia.allen@university.edu,password123,staff
+Christopher Young,christopher.young@university.edu,password123,staff
+Linda King,linda.king@university.edu,password123,staff
+Daniel Wright,daniel.wright@university.edu,password123,staff
+Barbara Lopez,barbara.lopez@university.edu,password123,staff
+Thomas Hill,thomas.hill@university.edu,password123,staff

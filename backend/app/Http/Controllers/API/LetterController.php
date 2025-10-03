@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Letter;
+use App\Models\LetterType;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
@@ -46,6 +47,20 @@ class LetterController extends Controller
             'status' => 'nullable|string|in:draft,pending,approved,rejected',
         ]);
 
+        // Check if user has access to this letter type
+        if ($request->input('letter_type_id')) {
+            $letterType = LetterType::find($request->input('letter_type_id'));
+            
+            if ($letterType && $letterType->allowed_roles) {
+                if (!$user->canAccessLetterType($letterType->allowed_roles)) {
+                    return response()->json([
+                        'message' => 'You do not have permission to create this type of letter.',
+                        'error' => 'Access denied'
+                    ], 403);
+                }
+            }
+        }
+
         $fields = (array) $request->input('fields', []);
         $title = trim((string) $request->input('title'));
         $content = trim((string) $request->input('content'));
@@ -53,6 +68,7 @@ class LetterController extends Controller
         // Debug logging
         Log::info('Letter creation attempt', [
             'user_id' => $user->id,
+            'user_role' => $user->role,
             'title' => $title,
             'letter_type_id' => $request->input('letter_type_id'),
             'fields_count' => count($fields),

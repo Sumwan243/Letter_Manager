@@ -14,6 +14,8 @@ import Settings from './pages/Settings';
 import PrivateRoute from './components/PrivateRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import AdminRecipients from './pages/AdminRecipients';
+import AdminUsers from './pages/AdminUsers';
+import AdminOffices from './pages/AdminOffices';
 
 export default function App() {
   return (
@@ -41,6 +43,22 @@ export default function App() {
               element={
                 <PrivateRoute roles={['admin']}>
                   <AdminRecipients />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/admin/users"
+              element={
+                <PrivateRoute roles={['admin']}>
+                  <AdminUsers />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/admin/offices"
+              element={
+                <PrivateRoute roles={['admin']}>
+                  <AdminOffices />
                 </PrivateRoute>
               }
             />

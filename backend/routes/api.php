@@ -6,6 +6,7 @@ use App\Http\Controllers\API\LetterTypeController;
 use App\Http\Controllers\API\LetterController;
 use App\Http\Controllers\API\LetterTemplateController;
 use App\Http\Controllers\API\UserController;
+use App\Http\Controllers\API\UserManagementController;
 use App\Http\Controllers\API\DepartmentController;
 use App\Http\Controllers\API\StaffController;
 
@@ -45,12 +46,28 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Profile
     Route::post('/profile', [UserController::class, 'updateProfile']);
+    Route::put('/password', [UserController::class, 'updatePassword']);
     
     // Admin-only routes
+    // Users list - accessible to all authenticated users (for dropdowns)
+    Route::get('/users', [UserManagementController::class, 'index']);
+    
     Route::middleware('admin')->group(function () {
         Route::post('/letter-types', [LetterTypeController::class, 'store']);
         Route::put('/letter-types/{letterType}', [LetterTypeController::class, 'update']);
         Route::delete('/letter-types/{letterType}', [LetterTypeController::class, 'destroy']);
         Route::delete('/letters/{letter}', [LetterController::class, 'destroy']);
+        
+        // User Management (admin only)
+        Route::put('/users/{user}/role', [UserManagementController::class, 'updateRole']);
+        Route::put('/users/{user}/profile', [UserManagementController::class, 'updateProfile']);
+        Route::put('/users/{user}/basic-info', [UserManagementController::class, 'updateBasicInfo']);
+        Route::delete('/users/{user}', [UserManagementController::class, 'destroy']);
+        Route::post('/users/bulk-import', [UserManagementController::class, 'bulkImport']);
+        Route::get('/users/download-template', [UserManagementController::class, 'downloadTemplate']);
+        
+        // Office Management
+        Route::apiResource('offices', \App\Http\Controllers\API\OfficeController::class);
+        Route::get('/offices/{office}/staff', [\App\Http\Controllers\API\OfficeController::class, 'getStaff']);
     });
 });

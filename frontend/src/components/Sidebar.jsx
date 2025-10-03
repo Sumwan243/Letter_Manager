@@ -15,7 +15,9 @@ export default function Sidebar({ role }) {
   ];
 
   const adminLinks = [
-    { to: "/admin", label: "Admin Dashboard", icon: <Users size={18} /> },
+    { to: "/admin", label: "Admin Dashboard", icon: <Home size={18} /> },
+    { to: "/admin/users", label: "Manage Staff", icon: <Users size={18} /> },
+    { to: "/admin/offices", label: "Manage Offices", icon: <FileText size={18} /> },
     { to: "/settings", label: "Settings", icon: <Settings size={18} /> },
   ];
 
@@ -72,11 +74,11 @@ export default function Sidebar({ role }) {
           <Link
             key={link.to}
             to={link.to}
-            className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200`}
+            className={`flex items-center ${collapsed ? 'justify-center p-3' : 'gap-3 px-3 py-2'} rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200`}
             title={collapsed ? link.label : undefined}
           >
-            {link.icon}
-            {!collapsed && link.label}
+            <span className="flex-shrink-0">{link.icon}</span>
+            {!collapsed && <span>{link.label}</span>}
           </Link>
         ))}
       </nav>
@@ -84,11 +86,11 @@ export default function Sidebar({ role }) {
       <div className="p-4 border-t border-gray-200 dark:border-gray-700">
         <button 
           onClick={handleLogout}
-          className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'} w-full text-left px-3 py-2 rounded-lg text-red-600 hover:bg-red-100 dark:hover:bg-gray-700 transition-colors duration-200`}
+          className={`flex items-center ${collapsed ? 'justify-center p-3' : 'gap-3 px-3 py-2'} w-full text-left rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors duration-200`}
           title={collapsed ? 'Logout' : undefined}
         >
-          <LogOut size={18} />
-          {!collapsed && 'Logout'}
+          <LogOut size={20} className="flex-shrink-0" />
+          {!collapsed && <span className="font-medium">Logout</span>}
         </button>
       </div>
     </div>

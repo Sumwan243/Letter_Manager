@@ -1,5 +1,5 @@
 import { createContext, useState, useEffect } from 'react';
-import { getCsrf, login as loginAPI, register as registerAPI, logout as logoutAPI, getCurrentUser } from '../api/auth';
+import { login as loginAPI, register as registerAPI, logout as logoutAPI, getCurrentUser } from '../api/auth';
 import axios from '../api/axios';
 
 export const AuthContext = createContext();
@@ -47,7 +47,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     setLoading(true);
     try {
-      await getCsrf();
+      // Bearer token auth - no CSRF cookie needed
       const response = await loginAPI({ email, password });
       const { user: userData, token } = response.data;
 
@@ -68,7 +68,7 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     setLoading(true);
     try {
-      await getCsrf();
+      // Bearer token auth - no CSRF cookie needed
       const response = await registerAPI(userData);
       const { user: newUser, token } = response.data;
       

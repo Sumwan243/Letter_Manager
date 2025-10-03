@@ -23,6 +23,10 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'position',
+        'department',
+        'office',
+        'phone',
     ];
 
     /**
@@ -65,10 +69,38 @@ class User extends Authenticatable
     }
 
     /**
+     * Check if user is executive
+     */
+    public function isExecutive()
+    {
+        return $this->role === 'executive';
+    }
+
+    /**
      * Check if user is staff
      */
     public function isStaff()
     {
         return $this->role === 'staff';
+    }
+
+    /**
+     * Check if user has access to a specific role
+     */
+    public function hasRole($role)
+    {
+        return $this->role === $role;
+    }
+
+    /**
+     * Check if user can access a letter type based on allowed roles
+     */
+    public function canAccessLetterType($allowedRoles)
+    {
+        if (empty($allowedRoles)) {
+            return true; // No restrictions
+        }
+        
+        return in_array($this->role, $allowedRoles);
     }
 }
