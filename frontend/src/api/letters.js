@@ -5,7 +5,7 @@ export const fetchLetterTypes = () => api.get('/api/letter-types');
 export const fetchLetterTypeById = (id) => api.get(`/api/letter-types/${id}`);
 
 // Letters CRUD operations (protected)
-export const fetchLetters = () => api.get('/api/letters');
+export const fetchLetters = (params = {}) => api.get('/api/letters', { params });
 export const fetchLetterById = (id) => api.get(`/api/letters/${id}`);
 export const createLetter = (data) => {
   console.log('API: Creating letter with data:', data);

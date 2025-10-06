@@ -4,6 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import Sidebar from '../components/Sidebar';
 import DynamicForm from '../components/DynamicForm';
 import { fetchLetters, createLetter, updateLetter, deleteLetter, updateLetterStatus, fetchLetterTypes } from '../api/letters';
+import { ORG_NAME, ORG_LOCAL_NAME, ORG_LOGO_URL } from '../config/org';
 
 export default function Letters() {
   const { user } = useContext(AuthContext);
@@ -22,12 +23,17 @@ export default function Letters() {
   const [editMode, setEditMode] = useState(false);
   const [previewFontFamily, setPreviewFontFamily] = useState('sans');
   const [previewFontSize, setPreviewFontSize] = useState(20);
+  const [autoScale, setAutoScale] = useState(1); // Auto-scale factor for fitting content
   // (reverted) keep original send flow; no status filter
   const [sendModalOpen, setSendModalOpen] = useState(false);
   const [sendTargetLetter, setSendTargetLetter] = useState(null);
   const [sendToEmail, setSendToEmail] = useState('');
   const [sending, setSending] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [filterDate, setFilterDate] = useState(''); // YYYY-MM-DD
+  // Recipients viewing state
+  const [viewAllRecipients, setViewAllRecipients] = useState(false);
+  const [selectedRecipientIdx, setSelectedRecipientIdx] = useState(0);
 
   // Debug logging
   console.log('Rendering Letters with:', { user, loading, error, letters });
@@ -96,7 +102,9 @@ export default function Letters() {
         setRefreshing(true);
         setError(null);
         console.log('Fetching letters...');
-        const response = await fetchLetters();
+        const params = {};
+        if (filterDate) params.date = filterDate;
+        const response = await fetchLetters(params);
         console.log('Letters response:', response);
 
         // Handle Laravel's paginated response
@@ -112,7 +120,7 @@ export default function Letters() {
     };
 
     loadLetters();
-  }, []);
+  }, [filterDate]);
 
   // --- Helper Functions ---
   const getStatusColor = (status) => {
@@ -250,11 +258,44 @@ export default function Letters() {
     }
   };
 
+  const openSendModal = (letter) => {
+    setSendTargetLetter(letter);
+    setSendModalOpen(true);
+  };
+
+  const closeSendModal = () => {
+    setSendModalOpen(false);
+    setSendTargetLetter(null);
+    setSendToEmail('');
+  };
+
+  const handleSendSubmit = async () => {
+    if (!sendToEmail || !sendTargetLetter) return;
+    
+    try {
+      setSending(true);
+      // Update letter status to "sent"
+      await updateLetterStatus(sendTargetLetter.id, 'sent');
+      setLetters(prev => prev.map(letter => 
+        letter.id === sendTargetLetter.id ? { ...letter, status: 'sent' } : letter
+      ));
+      alert(`Letter sent successfully to ${sendToEmail}!`);
+      closeSendModal();
+    } catch (err) {
+      console.error('Error sending letter:', err);
+      alert(`Failed to send letter: ${err.message}`);
+    } finally {
+      setSending(false);
+    }
+  };
+
   // Keep original send flow (no-op change marker)
 
   // Recipient resolver for list view based on new layouts
   const getListRecipient = (letter) => {
     const fields = letter?.fields || {};
+    const recipients = Array.isArray(fields.recipients) ? fields.recipients : [];
+    if (recipients.length > 0 && recipients[0]?.name) return recipients[0].name;
     const layout = getLetterLayout(letter?.letter_type);
     if (layout === 'executive') return fields.recipient_name || fields.recipient_company || 'Client/Partner';
     if (layout === 'staff') return fields.recipient_name || fields.recipient_company || 'Client';
@@ -382,6 +423,23 @@ export default function Letters() {
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Total: {filteredLetters.length} letters</p>
                   </div>
                   <div className="flex items-center space-x-3">
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-gray-600 dark:text-gray-300">Filter by date</label>
+                      <input
+                        type="date"
+                        value={filterDate}
+                        onChange={(e) => setFilterDate(e.target.value)}
+                        className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      />
+                      {filterDate && (
+                        <button
+                          onClick={() => setFilterDate('')}
+                          className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
                     <button onClick={refreshLetters} disabled={refreshing} className="px-4 py-2 text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 disabled:opacity-50 shadow-sm hover:shadow">
                       {refreshing ? 'Refreshing...' : 'Refresh'}
                     </button>
@@ -640,21 +698,44 @@ export default function Letters() {
                 <button
                   onClick={() => {
                     try {
-                      document.body.classList.add('print-view');
-                      const cleanup = () => document.body.classList.remove('print-view');
-                      // Cleanup after print
-                      const prev = window.onafterprint;
-                      window.onafterprint = () => { cleanup(); if (typeof prev === 'function') prev(); };
-                      window.print();
-                      // Fallback cleanup in case onafterprint doesn't fire
-                      setTimeout(cleanup, 1500);
+                      // Calculate and apply auto-scaling before print
+                      const letterContent = document.getElementById('letter-content');
+                      if (letterContent) {
+                        const availableHeight = 297 - 44; // 297mm A4 height - 44mm padding (22mm top + 22mm bottom)
+                        const contentHeight = letterContent.scrollHeight / 3.7795; // Convert pixels to mm (96 DPI)
+                        
+                        if (contentHeight > availableHeight) {
+                          const scale = availableHeight / contentHeight;
+                          setAutoScale(Math.max(0.5, scale)); // Minimum 50% scale
+                          
+                          // Wait for scale to apply
+                          setTimeout(() => {
+                            document.body.classList.add('print-view');
+                            const cleanup = () => {
+                              document.body.classList.remove('print-view');
+                              setAutoScale(1); // Reset scale after print
+                            };
+                            const prev = window.onafterprint;
+                            window.onafterprint = () => { cleanup(); if (typeof prev === 'function') prev(); };
+                            window.print();
+                            setTimeout(cleanup, 1500);
+                          }, 100);
+                        } else {
+                          document.body.classList.add('print-view');
+                          const cleanup = () => document.body.classList.remove('print-view');
+                          const prev = window.onafterprint;
+                          window.onafterprint = () => { cleanup(); if (typeof prev === 'function') prev(); };
+                          window.print();
+                          setTimeout(cleanup, 1500);
+                        }
+                      }
                     } catch {}
                   }}
                   className="btn btn-primary"
                 >
                   <span className="inline-flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
-                    Print
+                    Print (Auto-fit)
                   </span>
                 </button>
                 <button
@@ -669,17 +750,52 @@ export default function Letters() {
             </div>
             
             <div className="p-8 bg-gray-50 dark:bg-gray-800/50 overflow-auto print:p-0 print:bg-transparent print:overflow-visible" style={{ maxHeight: 'calc(90vh - 120px)' }}>
+              {/* Recipients viewer controls */}
+              {(() => {
+                const recips = Array.isArray(viewingLetter?.fields?.recipients) ? viewingLetter.fields.recipients : [];
+                if (recips.length === 0) return null;
+                const names = recips.map(r => r.name).filter(Boolean);
+                return (
+                  <div className="mb-4 flex items-center gap-3 print:hidden">
+                    <button
+                      type="button"
+                      className={`px-3 py-1.5 rounded-md text-sm ${viewAllRecipients ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'}`}
+                      onClick={() => setViewAllRecipients(v => !v)}
+                    >
+                      {viewAllRecipients ? 'Viewing: All recipients' : 'Viewing: Single recipient'}
+                    </button>
+                    {!viewAllRecipients && (
+                      <select
+                        value={selectedRecipientIdx}
+                        onChange={e => setSelectedRecipientIdx(Number(e.target.value))}
+                        className="px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm"
+                      >
+                        {names.map((n, i) => (
+                          <option key={i} value={i}>{n}</option>
+                        ))}
+                      </select>
+                    )}
+                    <div className="text-xs text-gray-600 dark:text-gray-300">Selected: {names.length}</div>
+                  </div>
+                );
+              })()}
               {/* A4 Paper Layout */}
               <div 
-                className={`mx-auto bg-white text-gray-900 shadow-lg print:shadow-none printable font-scale ${previewFontFamily === 'serif' ? 'font-serif' : previewFontFamily === 'mono' ? 'font-mono' : 'font-sans'}`}
+                id="letter-content"
+                className={`mx-auto bg-white text-gray-900 shadow-lg print:shadow-none printable print-content font-scale ${previewFontFamily === 'serif' ? 'font-serif' : previewFontFamily === 'mono' ? 'font-mono' : 'font-sans'}`}
                 style={{ 
                   width: '210mm', 
                   minHeight: '297mm', 
+                  maxHeight: '297mm',
                   padding: '22mm',
                   boxSizing: 'border-box',
                   backgroundColor: 'white',
                   fontSize: `${previewFontSize}px`,
-                  lineHeight: 1.7
+                  lineHeight: 1.7,
+                  overflow: 'hidden',
+                  transform: `scale(${autoScale})`,
+                  transformOrigin: 'top center',
+                  position: 'relative'
                 }}
               >
 
@@ -687,66 +803,72 @@ export default function Letters() {
                 {(() => {
                   const fields = viewingLetter.fields || {};
                   const layout = getLetterLayout(viewingLetter.letter_type);
+                  const recipientsArr = Array.isArray(fields.recipients) ? fields.recipients : [];
 
                   if (layout === 'staff') {
                     // Executive Formal Letter Layout - High-level official correspondence
                     const subjectText = fields.subject || '';
                     const contentText = fields.body || '';
-                    const printDate = fields.letter_date || '';
+                    const printDate = fields.letter_date || (viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', {year:'numeric', month:'long', day:'numeric'}) : '');
                     const fromText = fields.sender_name || fields.department_name || '';
                     const senderTitle = fields.sender_position || fields.sender_title || '';
-                    const recipientText = fields.recipient_name || fields.recipient || '';
-                    const recipientTitle = fields.recipient_title || fields.recipient_position || '';
+                    // resolve single recipient if not viewing all
+                    const currentRecipient = !viewAllRecipients && recipientsArr.length > 0 ? recipientsArr[Math.min(selectedRecipientIdx, recipientsArr.length - 1)] : null;
+                    const recipientText = currentRecipient?.name || fields.recipient_name || fields.recipient || '';
+                    const recipientTitle = currentRecipient?.title || fields.recipient_title || fields.recipient_position || '';
                     const refNoText = fields.ref_no || fields.reference_no || '';
                     const phoneText = fields.phone || fields.contact_information || '';
                     const emailText = fields.email || fields.sender_email || '';
-                    const companyLogo = fields.company_logo || '';
+                    const companyLogo = fields.company_logo || ORG_LOGO_URL;
                     const signatureImage = fields.signature_image || fields.signature || '';
-                    const organizationName = fields.organization_name || 'JIMMA UNIVERSITY';
-                    const organizationNameLocal = fields.organization_name_local || 'ጅማ ዩኒቨርሲቲ';
+                    const organizationName = fields.organization_name || ORG_NAME;
+                    const organizationNameLocal = fields.organization_name_local || ORG_LOCAL_NAME;
 
-                    return (
-                      <div style={{ fontFamily: 'Times New Roman, Times, serif' }} className="space-y-8">
-                        {/* Executive Header: Logo + Organization Name */}
+                    // Helper to render one page block for a recipient
+                    const renderRecipientPage = (recipient, isLast) => (
+                      <div key={recipient?.id || recipient?.name || 'single'} style={{ fontFamily: 'Times New Roman, Times, serif' }} className="space-y-8">
+                        {/* Organization Header (view-only) */}
                         <div className="text-center pt-8 pb-6 border-b-2 border-gray-300">
                           {companyLogo && (
                             <div className="mb-6">
-                              <img src={companyLogo} alt="Organization Logo" className="mx-auto h-36 w-auto object-contain" />
+                              <img src={companyLogo} alt="Organization Logo" className="mx-auto h-24 w-auto object-contain" />
                             </div>
                           )}
-                          <div className="uppercase font-bold mb-2" style={{ fontSize: '32px', letterSpacing: '1px', color: '#1a1a1a' }}>
+                          <div className="uppercase font-bold mb-1" style={{ fontSize: '28px', letterSpacing: '1px', color: '#1a1a1a' }}>
                             {organizationName}
                           </div>
-                          <div className="font-bold mb-3" style={{ fontSize: '30px', color: '#1a1a1a' }}>
+                          <div className="font-bold" style={{ fontSize: '26px', color: '#1a1a1a' }}>
                             {organizationNameLocal}
                           </div>
                           {fields.department_name && (
-                            <div className="uppercase font-semibold mt-3" style={{ fontSize: '18px', letterSpacing: '0.5px', color: '#4a4a4a' }}>
+                            <div className="uppercase font-semibold mt-2" style={{ fontSize: '16px', letterSpacing: '0.5px', color: '#4a4a4a' }}>
                               {fields.department_name}
                             </div>
                           )}
                         </div>
 
-                        {/* Reference Information Block */}
-                        <div className="mt-10">
-                          <div className="grid grid-cols-2 gap-4" style={{ fontSize: '18px' }}>
+                        {/* Reference and Sender Block (view-only) */}
+                        <div className="mt-8">
+                          <div className="grid grid-cols-2 gap-4" style={{ fontSize: '16px' }}>
                             <div>
                               <div className="flex gap-2">
                                 <span className="font-bold">From:</span>
                                 <div>
-                                  <div className="font-semibold">{fromText}</div>
-                                  {senderTitle && (
-                                    <div className="text-gray-700 italic">{senderTitle}</div>
+                                  <div className="font-semibold">{fromText || viewingLetter?.user?.name || ''}</div>
+                                  {(senderTitle || viewingLetter?.user?.position) && (
+                                    <div className="text-gray-700 italic">{senderTitle || viewingLetter?.user?.position}</div>
                                   )}
                                 </div>
                               </div>
                             </div>
                             <div className="text-right">
-                              <div className="space-y-2">
-                                <div>
-                                  <span className="font-bold">Ref No:</span>{' '}
-                                  <span className="font-mono underline underline-offset-2 decoration-gray-700">{refNoText}</span>
-                                </div>
+                              <div className="space-y-1">
+                                {refNoText && (
+                                  <div>
+                                    <span className="font-bold">Ref No:</span>{' '}
+                                    <span className="font-mono underline underline-offset-2 decoration-gray-700">{refNoText}</span>
+                                  </div>
+                                )}
                                 <div>
                                   <span className="font-bold">Date:</span>{' '}
                                   <span className="underline underline-offset-2 decoration-gray-700">{printDate}</span>
@@ -757,14 +879,14 @@ export default function Letters() {
                         </div>
 
                         {/* Recipient Information */}
-                        {recipientText && (
+                        {(recipient?.name || recipientText) && (
                           <div className="mt-8" style={{ fontSize: '18px' }}>
                             <div className="flex gap-2">
                               <span className="font-bold">To:</span>
                               <div>
-                                <div className="font-semibold">{recipientText}</div>
-                                {recipientTitle && (
-                                  <div className="text-gray-700 italic">{recipientTitle}</div>
+                                <div className="font-semibold">{recipient?.name || recipientText}</div>
+                                {(recipient?.title || recipientTitle) && (
+                                  <div className="text-gray-700 italic">{recipient?.title || recipientTitle}</div>
                                 )}
                               </div>
                             </div>
@@ -792,289 +914,170 @@ export default function Letters() {
                           <div className="font-medium">{fields.closing_salutation || 'Respectfully yours'},</div>
                         </div>
 
-                        {/* Spacer to push footer to bottom */}
-                        <div className="flex-grow" style={{ minHeight: '200px' }}></div>
+                        {/* Content continues; footer rendered globally below */}
+                        {!isLast && <div className="page-break" />}
+                      </div>
+                    );
 
-                        {/* Footer with Signature and Phone at Bottom */}
-                        {(signatureImage || phoneText) && (
-                          <div className="mt-auto pt-4 border-t border-gray-300">
-                            <div className="flex justify-between items-end">
-                              {signatureImage && (
-                                <div>
-                                  <div className="mb-2">
-                                    <img src={signatureImage} alt="Signature" className="h-20 w-auto object-contain" />
-                                  </div>
-                                  <div className="border-t-2 border-gray-800 w-48" />
-                                </div>
-                              )}
-                              {phoneText && (
-                                <div className="text-sm text-gray-600 ml-auto">Tel: {phoneText}</div>
+                    // If viewing all recipients, render a page per recipient
+                    if (viewAllRecipients && recipientsArr.length > 0) {
+                      return (
+                        <div>
+                          {recipientsArr.map((r, idx) => renderRecipientPage(r, idx === recipientsArr.length - 1))}
+                        </div>
+                      );
+                    }
+                    // Else render single page using either selected recipient or field values
+                    return renderRecipientPage(currentRecipient, true);
+                  }
+
+                  // Default path: render per-recipient pages if viewing all; else single page
+                  const fieldsInner = viewingLetter.fields || {};
+                  const recipients = Array.isArray(fieldsInner.recipients) ? fieldsInner.recipients : [];
+                  const organizationName = fieldsInner.organization_name || ORG_NAME;
+                  const organizationNameLocal = fieldsInner.organization_name_local || ORG_LOCAL_NAME;
+                  const companyLogo = fieldsInner.company_logo || ORG_LOGO_URL;
+
+                  const renderOnePage = (recipient, isLast) => {
+                    // Title resolution
+                    const titleFromFields = (() => {
+                      const tfs = ['notice_title', 'meeting_title', 'letter_purpose', 'job_title'];
+                      for (const n of tfs) if (fieldsInner[n]) return fieldsInner[n];
+                      return viewingLetter.title || '';
+                    })();
+                    // Content resolution
+                    const bodyText = (() => {
+                      const cfs = ['body', 'notice_content', 'letter_content', 'meeting_objectives', 'impact_description', 'personal_message'];
+                      for (const n of cfs) if (fieldsInner[n]) return fieldsInner[n];
+                      return viewingLetter.content || '';
+                    })();
+                    // Recipient specifics
+                    const name = recipient?.name || fieldsInner.recipient_name || fieldsInner.recipient || '';
+                    const title = recipient?.title || fieldsInner.recipient_title || '';
+                    const company = recipient?.company || fieldsInner.recipient_company || '';
+
+                    return (
+                      <div key={recipient?.id || recipient?.name || 'exec-single'} className={`space-y-6`}>
+                        {/* Org Header */}
+                        <div className="text-center pt-4 pb-4 border-b border-gray-200">
+                          {companyLogo && (
+                            <div className="mb-3">
+                              <img src={companyLogo} alt="Organization Logo" className="mx-auto h-16 w-auto object-contain" />
+                            </div>
+                          )}
+                          <div className="uppercase font-bold mb-0.5" style={{ fontSize: '22px', letterSpacing: '0.5px' }}>
+                            {organizationName}
+                          </div>
+                          <div className="font-bold" style={{ fontSize: '20px' }}>
+                            {organizationNameLocal}
+                          </div>
+                        </div>
+                        <div className="mt-4 flex items-start justify-between text-sm text-gray-700">
+                          <div>
+                            <span className="font-semibold">From:</span>{' '}
+                            <span className="font-medium">{viewingLetter?.user?.name || ''}</span>
+                            {viewingLetter?.user?.position && (
+                              <span className="italic">{' '}• {viewingLetter.user.position}</span>
+                            )}
+                          </div>
+                          <div>
+                            <span className="font-semibold">Date:</span>{' '}
+                            <span>{viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : ''}</span>
+                          </div>
+                        </div>
+
+                        {/* Title */}
+                        {titleFromFields && (
+                          <div className="mt-8 mb-6">
+                            <h2 className="text-xl font-semibold text-gray-900 text-center">{titleFromFields}</h2>
+                          </div>
+                        )}
+
+                        {/* To */}
+                        <div className="mt-8 mb-8" style={{ fontSize: '18px' }}>
+                          <div className="flex gap-2">
+                            <span className="font-bold">To:</span>
+                            <div>
+                              <div className="font-semibold">{name || 'Recipient'}</div>
+                              {title && (<div className="text-gray-700 italic">{title}</div>)}
+                              {company && (<div className="text-gray-700">{company}</div>)}
+                              {fieldsInner.recipient_address && (
+                                <div className="text-gray-700 whitespace-pre-line">{fieldsInner.recipient_address}</div>
                               )}
                             </div>
                           </div>
+                        </div>
+
+                        {/* Subject */}
+                        {fieldsInner.subject && (
+                          <div className="mt-8 pt-6 border-t border-gray-200" style={{ fontSize: '18px' }}>
+                            <div className="font-semibold uppercase" style={{ letterSpacing: '0.3px' }}>
+                              {fieldsInner.subject}
+                            </div>
+                          </div>
                         )}
+
+                        {/* Body */}
+                        {bodyText && (
+                          <div className="mt-6">
+                            <div className="text-base text-gray-700 leading-relaxed">
+                              <p className="whitespace-pre-wrap">{bodyText}</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Closing */}
+                        <div className="mt-12" style={{ fontSize: '17px' }}>
+                          <div className="font-medium">{fieldsInner.closing_salutation || 'Sincerely'},</div>
+                        </div>
+
+                        {!isLast && <div className="page-break" />}
+                      </div>
+                    );
+                  };
+
+                  if (viewAllRecipients && recipients.length > 0) {
+                    return (
+                      <div>
+                        {recipients.map((r, idx) => renderOnePage(r, idx === recipients.length - 1))}
                       </div>
                     );
                   }
-
-                  // Default path renders header then generic sections below
-                  return (
-                    <div className={`space-y-6`}>
-                    {(() => {
-                    const typeName = viewingLetter.letter_type?.name?.toLowerCase() || '';
-                    const fieldsInner = viewingLetter.fields || {};
-                    
-                    // Different layouts based on letter type
-                    if (layout === 'executive') {
-                      // Formal – Executive Layout
-                      return (
-                        <>
-                          {/* Header with optional logo and name on the left; address below; date on the right */}
-                          <div className="flex justify-between items-start mb-10 pt-4">
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-4">
-                                {fieldsInner.company_logo && (
-                                  <img
-                                    src={fieldsInner.company_logo}
-                                    alt="Company Logo"
-                                    className="h-24 w-auto object-contain"
-                                  />
-                                )}
-                                {(fieldsInner.company_name || fieldsInner.sender_company) && (
-                                  <h2 className="text-2xl font-bold text-gray-900">
-                                    {fieldsInner.company_name || fieldsInner.sender_company}
-                                  </h2>
-                                )}
-                              </div>
-                              {/* Address below the logo/name to avoid cramping */}
-                              <div className="mt-3">
-                                {fieldsInner.address_line1 && (
-                                  <p className="text-base text-gray-600">{fieldsInner.address_line1}</p>
-                                )}
-                                {fieldsInner.address_line2 && (
-                                  <p className="text-base text-gray-600">{fieldsInner.address_line2}</p>
-                                )}
-                                {(fieldsInner.city || fieldsInner.state || fieldsInner.zip_code) && (
-                                  <p className="text-base text-gray-600">
-                                    {[fieldsInner.city, fieldsInner.state].filter(Boolean).join(', ')}{(fieldsInner.city || fieldsInner.state) && fieldsInner.zip_code ? ` ${fieldsInner.zip_code}` : fieldsInner.zip_code || ''}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-base text-gray-600">
-                                {viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', {
-                                  year: 'numeric',
-                                  month: 'long',
-                                  day: 'numeric'
-                                }) : ''}
-                              </p>
-                            </div>
-                          </div>
-                        </>
-                      );
-                    } else if (getLetterLayout(viewingLetter.letter_type) === 'informal') {
-                      // Informal (personal) Layout
-                      return (
-                        <>
-                          {/* Personal Letter Header */}
-                          <div className="mb-10 pt-4">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                                  {fields.sender_name || 'Your Name'}
-                                </h2>
-                                {fields.sender_address && (
-                                  <p className="text-base text-gray-600 whitespace-pre-line">{fields.sender_address}</p>
-                                )}
-                              </div>
-                              <div className="text-right">
-                                <p className="text-base text-gray-600">
-                                  {fields.letter_date || (viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', { 
-                                    year: 'numeric', 
-                                    month: 'long', 
-                                    day: 'numeric' 
-                                  }) : '')}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        </>
-                      );
-                    } else {
-                      // Fallback to executive style
-                      return (
-                        <>
-                          {/* Header with optional logo on the left and date on the right */}
-                          <div className="flex justify-between items-start mb-10 pt-4">
-                            <div className="flex items-start space-x-4 flex-1">
-                              {fields.company_logo && (
-                                <img
-                                  src={fields.company_logo}
-                                  alt="Company Logo"
-                                  className="h-24 w-auto object-contain"
-                                />
-                              )}
-                              <div>
-                                <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                                  {fields.company_name || fields.sender_company || ''}
-                                </h2>
-                                {fields.address_line1 && (
-                                  <p className="text-base text-gray-600">{fields.address_line1}</p>
-                                )}
-                                {fields.address_line2 && (
-                                  <p className="text-base text-gray-600">{fields.address_line2}</p>
-                                )}
-                                {(fields.city || fields.state || fields.zip_code) && (
-                                  <p className="text-base text-gray-600">
-                                    {[fields.city, fields.state].filter(Boolean).join(', ')}{(fields.city || fields.state) && fields.zip_code ? ` ${fields.zip_code}` : fields.zip_code || ''}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-base text-gray-600">
-                                {viewingLetter.created_at ? new Date(viewingLetter.created_at).toLocaleDateString('en-US', {
-                                  year: 'numeric',
-                                  month: 'long',
-                                  day: 'numeric'
-                                }) : ''}
-                              </p>
-                            </div>
-                          </div>
-                        </>
-                      );
-                    }
-                  })()}
-
-                  {/* Letter Title */}
-                  {(() => {
-                    const fields = viewingLetter.fields || {};
-                    const titleFields = ['notice_title', 'meeting_title', 'letter_purpose', 'job_title'];
-                    
-                    // Look for title in template-specific fields
-                    for (const fieldName of titleFields) {
-                      if (fields[fieldName]) {
-                        return (
-                          <div className="mt-8 mb-6">
-                            <h2 className="text-xl font-semibold text-gray-900 text-center">
-                              {fields[fieldName]}
-                            </h2>
-                          </div>
-                        );
-                      }
-                    }
-                    
-                    // Fallback to main title field
-                    if (viewingLetter.title) {
-                      return (
-                        <div className="mt-8 mb-6">
-                          <h2 className="text-xl font-semibold text-gray-900 text-center">
-                            {viewingLetter.title}
-                          </h2>
-                        </div>
-                      );
-                    }
-                    
+                  const currentRecipient = (() => {
+                    const recips = recipients;
+                    if (!viewAllRecipients && recips.length > 0) return recips[Math.min(selectedRecipientIdx, recips.length - 1)];
                     return null;
-                  })()}
-
-                  {/* To: Recipient */}
-                  <div className="mt-8 mb-8" style={{ fontSize: '18px' }}>
-                    <div className="flex gap-2">
-                      <span className="font-bold">To:</span>
-                      <div>
-                        <div className="font-semibold">
-                          {(() => {
-                            const fields = viewingLetter.fields || {};
-                            const layout = getLetterLayout(viewingLetter.letter_type);
-                            if (layout === 'executive') {
-                              return fields.recipient_name || fields.recipient_company || 'Client/Partner';
-                            }
-                            if (layout === 'staff') {
-                              return fields.recipient_name || fields.recipient_company || 'Client';
-                            }
-                            if (layout === 'informal') {
-                              return fields.recipient_name || 'Recipient';
-                            }
-                            return fields.recipient_name || fields.recipient || fields.to || 'Not specified';
-                          })()}
-                        </div>
-                        {viewingLetter.fields?.recipient_title && (
-                          <div className="text-gray-700 italic">{viewingLetter.fields.recipient_title}</div>
-                        )}
-                        {viewingLetter.fields?.recipient_company && (
-                          <div className="text-gray-700">{viewingLetter.fields.recipient_company}</div>
-                        )}
-                        {viewingLetter.fields?.recipient_address && (
-                          <div className="text-gray-700 whitespace-pre-line">{viewingLetter.fields.recipient_address}</div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Subject Line */}
-                  {viewingLetter.fields?.subject && (
-                    <div className="mt-8 pt-6 border-t border-gray-200" style={{ fontSize: '18px' }}>
-                      <div className="font-semibold uppercase" style={{ letterSpacing: '0.3px' }}>
-                        {viewingLetter.fields.subject}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Letter Body */}
-                  <div className="mt-6">
-                    <div className="text-base text-gray-700 leading-relaxed">
-                      <p className="whitespace-pre-wrap">
-                        {(() => {
-                          const fields = viewingLetter.fields || {};
-                          const contentFields = ['body', 'notice_content', 'letter_content', 'meeting_objectives', 'impact_description', 'personal_message'];
-                          
-                          // Look for content in template-specific fields
-                          for (const fieldName of contentFields) {
-                            if (fields[fieldName]) {
-                              return fields[fieldName];
-                            }
-                          }
-                          
-                          // Fallback to main content field
-                          return viewingLetter.content || 'No content available';
-                        })()}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Closing */}
-                  <div className="mt-12" style={{ fontSize: '17px' }}>
-                    <div className="font-medium">{viewingLetter.fields?.closing_salutation || 'Sincerely'},</div>
-                  </div>
-
-                  {/* Spacer to push footer to bottom */}
-                  <div className="flex-grow" style={{ minHeight: '200px' }}></div>
-
-                  {/* Footer with Signature and Phone at Bottom */}
-                  {(viewingLetter.fields?.signature_image || viewingLetter.fields?.phone) && (
-                    <div className="mt-auto pt-4 border-t border-gray-300">
-                      <div className="flex justify-between items-end">
-                        {viewingLetter.fields?.signature_image && (
-                          <div>
-                            <div className="mb-2">
-                              <img src={viewingLetter.fields.signature_image} alt="Signature" className="h-20 w-auto object-contain" />
-                            </div>
-                            <div className="border-t-2 border-gray-800 w-48" />
-                          </div>
-                        )}
-                        {viewingLetter.fields?.phone && (
-                          <div className="text-sm text-gray-600 ml-auto">Tel: {viewingLetter.fields.phone}</div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                  );
+                  })();
+                  return renderOnePage(currentRecipient, true);
                 })()}
               </div>
             </div>
+            {/* Fixed footer that will repeat on each printed page */}
+            {(() => {
+              const f = viewingLetter?.fields || {};
+              const sig = f.signature_image || f.signature || '';
+              const tel = f.phone || f.contact_information || '';
+              if (!sig && !tel) return null;
+              return (
+                <div className="letter-footer">
+                  <div className="printable-footer-inner">
+                    <div className="pt-2 border-t border-gray-300 flex items-end justify-between">
+                      {sig && (
+                        <div>
+                          <div className="mb-2">
+                            <img src={sig} alt="Signature" className="h-16 w-auto object-contain" />
+                          </div>
+                          <div className="border-t-2 border-gray-800 w-40" />
+                        </div>
+                      )}
+                      {tel && (
+                        <div className="text-xs text-gray-600 ml-auto">Tel: {tel}</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

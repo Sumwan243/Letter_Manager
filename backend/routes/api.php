@@ -52,6 +52,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // Users list - accessible to all authenticated users (for dropdowns)
     Route::get('/users', [UserManagementController::class, 'index']);
     
+    // Office Management - READ access for all authenticated users (staff need this for letter creation)
+    Route::get('/offices', [\App\Http\Controllers\API\OfficeController::class, 'index']);
+    Route::get('/offices/{office}', [\App\Http\Controllers\API\OfficeController::class, 'show']);
+    Route::get('/offices/{office}/staff', [\App\Http\Controllers\API\OfficeController::class, 'getStaff']);
+    
     Route::middleware('admin')->group(function () {
         Route::post('/letter-types', [LetterTypeController::class, 'store']);
         Route::put('/letter-types/{letterType}', [LetterTypeController::class, 'update']);
@@ -66,8 +71,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/users/bulk-import', [UserManagementController::class, 'bulkImport']);
         Route::get('/users/download-template', [UserManagementController::class, 'downloadTemplate']);
         
-        // Office Management
-        Route::apiResource('offices', \App\Http\Controllers\API\OfficeController::class);
-        Route::get('/offices/{office}/staff', [\App\Http\Controllers\API\OfficeController::class, 'getStaff']);
+        // Office Management - WRITE access (admin only)
+        Route::post('/offices', [\App\Http\Controllers\API\OfficeController::class, 'store']);
+        Route::put('/offices/{office}', [\App\Http\Controllers\API\OfficeController::class, 'update']);
+        Route::delete('/offices/{office}', [\App\Http\Controllers\API\OfficeController::class, 'destroy']);
     });
 });

@@ -18,16 +18,23 @@ class LetterController extends Controller
     {
         $user = Auth::user();
         
-        if ($user->isAdmin()) {
-            // Admin can see all letters
-            $letters = Letter::with(['user', 'letterType'])->latest()->paginate(15);
-        } else {
-            // Staff can only see their own letters
-            $letters = Letter::with(['user', 'letterType'])
-                ->where('user_id', $user->id)
-                ->latest()
-                ->paginate(15);
+        $query = Letter::with(['user', 'letterType']);
+        
+        // Scope by role
+        if (!$user->isAdmin()) {
+            $query->where('user_id', $user->id);
         }
+        
+        // Optional date filter (YYYY-MM-DD)
+        if ($request->filled('date')) {
+            $date = $request->query('date');
+            // Only apply if valid format; simple check
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+                $query->whereDate('created_at', $date);
+            }
+        }
+
+        $letters = $query->latest()->paginate(15);
 
         return response()->json($letters);
     }

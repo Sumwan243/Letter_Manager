@@ -12,8 +12,11 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
 
   const [staff, setStaffList] = useState([]);
   const [offices, setOffices] = useState([]);
-  const [selectedOffice, setSelectedOffice] = useState('');
-  const [selectedStaff, setSelectedStaff] = useState('');
+  const [selectedOffices, setSelectedOffices] = useState([]); // multi
+  const [selectedStaffIds, setSelectedStaffIds] = useState([]); // multi
+  const [excludedStaffIds, setExcludedStaffIds] = useState([]); // staff excluded when an office is selected
+  const [recipientsOpen, setRecipientsOpen] = useState(false);
+  const [multiSelectMode, setMultiSelectMode] = useState(true); // if false: clicking a staff selects only that one and closes
 
   useEffect(() => {
     const loadLetterType = async () => {
@@ -62,36 +65,30 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
           setFields(transformedFields);
 
           const initialData = {};
-          const today = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
-          
+
+          // Initialize fields and auto-fill hidden sender/org details from registration
           transformedFields.forEach(field => {
             if (editMode && editingLetter?.fields?.[field.name]) {
               initialData[field.name] = editingLetter.fields[field.name];
-            } else if (field.name === 'letter_date') {
-              // Auto-fill letter date with today's date
-              initialData[field.name] = today;
-            } else if (field.name === 'sender_name') {
-              // Auto-fill sender name from logged-in user
-              initialData[field.name] = user?.name || '';
-            } else if (field.name === 'sender_position' || field.name === 'sender_title') {
-              // Auto-fill sender position from user profile
-              initialData[field.name] = user?.position || '';
-            } else if (field.name === 'department_name') {
-              // Auto-fill department from user profile
-              initialData[field.name] = user?.department || '';
-            } else if (field.name === 'phone' || field.name === 'contact_information') {
-              // Auto-fill phone from user profile
-              initialData[field.name] = user?.phone || '';
-            } else if (field.name === 'email' || field.name === 'sender_email') {
-              // Auto-fill email from user profile
-              initialData[field.name] = user?.email || '';
-            } else if (field.name === 'sender_company' || field.name === 'company_name') {
-              // Auto-fill office/company from user profile
-              initialData[field.name] = user?.office || '';
             } else {
-              initialData[field.name] = '';
+              // Auto-fill hidden sender fields from user profile
+              if (['sender_name'].includes(field.name)) initialData[field.name] = user?.name || '';
+              else if (['sender_position','sender_title'].includes(field.name)) initialData[field.name] = user?.position || '';
+              else if (['sender_department','department_name'].includes(field.name)) initialData[field.name] = user?.department || '';
+              else if (['phone','contact_information'].includes(field.name)) initialData[field.name] = user?.phone || '';
+              else if (['email','sender_email'].includes(field.name)) initialData[field.name] = user?.email || '';
+              else if (['sender_company','company_name'].includes(field.name)) initialData[field.name] = user?.office || '';
+              else initialData[field.name] = '';
             }
           });
+          // Add basic title/body placeholders for minimal UI
+          if (editMode && editingLetter) {
+            initialData.__title = editingLetter.title || '';
+            initialData.__body = editingLetter.content || '';
+          } else {
+            initialData.__title = '';
+            initialData.__body = '';
+          }
           setFormData(initialData);
 
           if (editMode && editingLetter) {
@@ -101,7 +98,7 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
                 editingData[field.name] = editingLetter.fields[field.name];
               }
             });
-            setFormData(editingData);
+            setFormData(prev => ({ ...prev, ...editingData }));
           }
 
           // Staff template loaded - offices will be loaded separately
@@ -145,8 +142,8 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
         
         // Filter by office if selected
         let filteredUsers = users;
-        if (selectedOffice) {
-          filteredUsers = users.filter(u => u.office === selectedOffice);
+        if (selectedOffices && selectedOffices.length > 0) {
+          filteredUsers = users.filter(u => selectedOffices.includes(u.office));
         }
         
         // Map to the format expected by the form
@@ -165,7 +162,21 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
       }
     };
     loadStaff();
-  }, [selectedOffice]);
+  }, [selectedOffices]);
+
+  // Recompute formData.recipients when selections change
+  useEffect(() => {
+    const fromOffices = staff
+      .filter(s => selectedOffices.includes(s.office))
+      .filter(s => !excludedStaffIds.includes(String(s.id)) && !excludedStaffIds.includes(s.id));
+    const fromManual = staff.filter(s => selectedStaffIds.includes(String(s.id)) || selectedStaffIds.includes(s.id));
+    const map = new Map();
+    [...fromOffices, ...fromManual].forEach(s => {
+      map.set(String(s.id), { id: s.id, name: s.name, title: s.position || '', company: s.office || '', email: s.email || '' });
+    });
+    const recipients = Array.from(map.values());
+    setFormData(prev => ({ ...prev, recipients }));
+  }, [selectedOffices, selectedStaffIds, excludedStaffIds, staff]);
 
   const handleChange = (e, name) => {
     setFormData(prev => ({ ...prev, [name]: e.target.value }));
@@ -178,34 +189,55 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
     let mainContent = '';
     let title = '';
 
+    // Prefer minimal UI fields first
+    if (formData.__body && String(formData.__body).trim()) {
+      mainContent = String(formData.__body).trim();
+    }
+    if (formData.__title && String(formData.__title).trim()) {
+      title = String(formData.__title).trim();
+    }
+
     for (const fieldName of contentFields) {
       if (formData[fieldName]) {
-        mainContent = formData[fieldName];
+        if (!mainContent) mainContent = formData[fieldName];
         break;
       }
     }
 
     const titleFields = ['notice_title', 'meeting_title', 'letter_purpose', 'job_title'];
     for (const fieldName of titleFields) {
-      if (formData[fieldName]) {
+      if (!title && formData[fieldName]) {
         title = formData[fieldName];
         break;
       }
     }
 
+    const payloadFields = {
+      ...formData,
+      // Ensure hidden auto-filled fields are present
+      sender_name: user?.name || '',
+      sender_position: user?.position || '',
+      sender_title: user?.position || '',
+      sender_company: user?.office || '',
+      sender_department: user?.department || '',
+      phone: user?.phone || '',
+      email: user?.email || '',
+      contact_information: user?.phone || user?.email || ''
+    };
+
     console.log('DynamicForm submitting with data:', {
-      title: title,
+      title,
       content: mainContent,
       letter_type_id: typeId,
-      fields: formData
+      fields: payloadFields
     });
 
     if (onLetterCreated) {
       onLetterCreated({
-        title: title,
+        title,
         content: mainContent,
         letter_type_id: typeId,
-        fields: formData
+        fields: payloadFields
       });
     }
   };
@@ -218,12 +250,14 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
   };
 
   const renderField = (field) => {
+    // Remove date selection from template UI and hide organization/sender fields
+    const orgFields = ['company_logo', 'organization_name', 'organization_name_local', 'company_name', 'address_line1', 'address_line2', 'city', 'state', 'zip_code', 'department_name'];
+    const senderFields = ['sender_name', 'sender_position', 'sender_title', 'sender_company', 'sender_department', 'phone', 'email', 'sender_email', 'contact_information'];
+    if (field.name === 'letter_date') return null;
+    if (orgFields.includes(field.name) || senderFields.includes(field.name)) return null;
+
     const fieldType = field.type || (field[field.name] && typeof field[field.name] === 'object' ? field[field.name].type : 'text');
     const fieldOptions = field.options || (field[field.name] && field[field.name].options) || [];
-
-    // Check if this is a sender field that should be read-only
-    const senderFields = ['sender_name', 'sender_position', 'sender_title', 'sender_company', 'company_name', 'phone', 'email', 'sender_email', 'contact_information'];
-    const isReadOnly = senderFields.includes(field.name);
 
     const commonProps = {
       id: field.name,
@@ -231,19 +265,56 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
       value: formData[field.name] || '',
       onChange: (e) => handleChange(e, field.name),
       required: false,
-      readOnly: isReadOnly,
-      className: `w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg ${isReadOnly ? 'bg-gray-100 dark:bg-gray-700 cursor-not-allowed' : 'bg-white dark:bg-gray-800'} text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent`
+      className: `w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent`
     };
 
     switch (fieldType) {
       case 'textarea':
+        const charCount = (formData[field.name] || '').length;
+        const charLimit = 2000; // Approximate limit for one A4 page
+        const isNearLimit = charCount > charLimit * 0.8;
+        const isOverLimit = charCount > charLimit;
+        
         return (
-          <textarea
-            {...commonProps}
-            rows={4}
-            className={commonProps.className + " resize-none"}
-            placeholder={`Enter ${getFieldLabel(field.name).toLowerCase()}...`}
-          />
+          <div>
+            <textarea
+              {...commonProps}
+              rows={6}
+              className={commonProps.className + " resize-none"}
+              placeholder={`Enter ${getFieldLabel(field.name).toLowerCase()}...`}
+            />
+            {field.name === 'body' && (
+              <div className={`mt-2 flex items-center justify-between text-xs ${isOverLimit ? 'text-red-600 dark:text-red-400' : isNearLimit ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                <div className="flex items-center gap-2">
+                  {isOverLimit && (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  )}
+                  {isNearLimit && !isOverLimit && (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  )}
+                  <span className="font-medium">
+                    {isOverLimit 
+                      ? `Content too long! Will be auto-scaled to fit one page. ${charCount}/${charLimit} chars`
+                      : isNearLimit 
+                      ? `Approaching limit: ${charCount}/${charLimit} chars`
+                      : `${charCount}/${charLimit} characters`}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className={`h-1.5 w-24 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden`}>
+                    <div 
+                      className={`h-full ${isOverLimit ? 'bg-red-500' : isNearLimit ? 'bg-yellow-500' : 'bg-blue-500'} transition-all duration-300`}
+                      style={{ width: `${Math.min(100, (charCount / charLimit) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         );
       case 'select':
         return (
@@ -368,9 +439,14 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
     acc[category].push(field);
     return acc;
   }, {});
+  // Remove Organization from UI for a cleaner template form
+  if (groupedFields['Organization']) {
+    delete groupedFields['Organization'];
+  }
 
-  const categoryOrder = ['Organization', 'Reference', 'Sender', 'Recipient', 'Content', 'Signature & Contact', 'Other'];
+  const categoryOrder = ['Recipient', 'Signature & Contact'];
   const orderedCategories = categoryOrder.filter(cat => groupedFields[cat]);
+  const hasRecipientField = fields.some(f => f.name === 'recipient' || f.name === 'recipient_name');
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -389,6 +465,233 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
             <p className="text-gray-600 dark:text-gray-400 mt-1 text-sm">
               {editMode ? 'Update the letter information below' : letterType.description || 'Fill in the required information for your letter'}
             </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Standalone Recipients selector if template doesn't define a recipient field (e.g., Executive) */}
+      {!hasRecipientField && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+          <div className="mb-3">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Recipients</label>
+          </div>
+          {/* Trigger button */}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setRecipientsOpen(v => !v)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow hover:shadow-md focus:ring-2 focus:ring-blue-400"
+            >
+              Select recipients
+              {Array.isArray(formData.recipients) && formData.recipients.length > 0 && (
+                <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-white/20">{formData.recipients.length} selected</span>
+              )}
+            </button>
+            <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input type="checkbox" checked={multiSelectMode} onChange={(e) => setMultiSelectMode(e.target.checked)} />
+              Multi-select
+            </label>
+          </div>
+
+          {/* Dropdown panel */}
+          {recipientsOpen && (
+            <div className="relative mt-3">
+              <div className="absolute z-20 w-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-2xl p-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Offices */}
+                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <h5 className="font-semibold text-gray-800 dark:text-gray-200">Offices</h5>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+                          onClick={() => {
+                            const all = offices.filter(o => o.is_active).map(o => o.name);
+                            setSelectedOffices(all);
+                            setExcludedStaffIds([]);
+                          }}
+                        >Select all</button>
+                        <button
+                          type="button"
+                          className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                          onClick={() => {
+                            setSelectedOffices([]);
+                            setExcludedStaffIds([]);
+                          }}
+                        >Unselect all</button>
+                      </div>
+                    </div>
+                    <div className="max-h-56 overflow-auto space-y-1">
+                      {offices.filter(o => o.is_active).map((o) => {
+                        const checked = selectedOffices.includes(o.name);
+                        return (
+                          <label key={o.id} className={`flex items-center justify-between gap-3 px-3 py-2 rounded-lg cursor-pointer border ${checked ? 'bg-blue-50 border-blue-300 dark:bg-blue-950/50 dark:border-blue-800' : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800'}`}>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedOffices(prev => Array.from(new Set([...prev, o.name])));
+                                    const idsToClear = staff.filter(s => s.office === o.name).map(s => String(s.id));
+                                    setExcludedStaffIds(prev => prev.filter(id => !idsToClear.includes(String(id))));
+                                  } else {
+                                    setSelectedOffices(prev => prev.filter(name => name !== o.name));
+                                  }
+                                }}
+                              />
+                              <span className="font-medium text-gray-800 dark:text-gray-200">{o.name}</span>
+                            </div>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
+                              {staff.filter(s => s.office === o.name).length} staff
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Staff */}
+                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <h5 className="font-semibold text-gray-800 dark:text-gray-200">Staff</h5>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+                          onClick={() => {
+                            const ids = staff.map(s => String(s.id));
+                            setSelectedStaffIds(ids);
+                          }}
+                        >Select all</button>
+                        <button
+                          type="button"
+                          className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                          onClick={() => {
+                            setSelectedStaffIds([]);
+                            setExcludedStaffIds([]);
+                          }}
+                        >Unselect all</button>
+                      </div>
+                    </div>
+                    <div className="max-h-56 overflow-auto divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-100 dark:border-gray-800">
+                      {staff.map((s) => {
+                        const fromOffice = selectedOffices.includes(s.office);
+                        const manually = selectedStaffIds.includes(String(s.id));
+                        const excluded = excludedStaffIds.includes(String(s.id));
+                        const effectiveChecked = (fromOffice && !excluded) || manually;
+                        return (
+                          <div key={s.id} className={`flex items-center justify-between px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer ${effectiveChecked ? 'bg-green-50 dark:bg-green-900/20' : ''}`}
+                            onClick={(e) => {
+                              const clickedCheckbox = (e.target && e.target.tagName === 'INPUT');
+                              if (clickedCheckbox) return;
+                              if (!multiSelectMode) {
+                                setSelectedOffices([]);
+                                setExcludedStaffIds([]);
+                                setSelectedStaffIds([String(s.id)]);
+                                setRecipientsOpen(false);
+                              } else {
+                                const id = String(s.id);
+                                const isSelected = effectiveChecked;
+                                if (isSelected) {
+                                  if (fromOffice && !excluded) setExcludedStaffIds(prev => Array.from(new Set([...prev, id])));
+                                  if (manually) setSelectedStaffIds(prev => prev.filter(x => x !== id));
+                                } else {
+                                  setSelectedStaffIds(prev => Array.from(new Set([...prev, id])));
+                                  setExcludedStaffIds(prev => prev.filter(x => x !== id));
+                                }
+                              }
+                            }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="checkbox"
+                                className="rounded"
+                                checked={effectiveChecked}
+                                onChange={(e) => {
+                                  const id = String(s.id);
+                                  if (e.target.checked) {
+                                    setSelectedStaffIds(prev => Array.from(new Set([...prev, id])));
+                                    setExcludedStaffIds(prev => prev.filter(x => x !== id));
+                                  } else {
+                                    if (selectedOffices.includes(s.office)) {
+                                      setExcludedStaffIds(prev => Array.from(new Set([...prev, id])));
+                                    } else {
+                                      setSelectedStaffIds(prev => prev.filter(x => x !== id));
+                                    }
+                                  }
+                                }}
+                              />
+                              <div>
+                                <div className="font-medium text-gray-900 dark:text-gray-100">{s.name}</div>
+                                <div className="text-xs text-gray-600 dark:text-gray-400">{s.position || 'Staff'} • {s.office || 'Office'}</div>
+                              </div>
+                            </div>
+                            {effectiveChecked && (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">Selected</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Selected chips */}
+                {Array.isArray(formData.recipients) && formData.recipients.length > 0 && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {formData.recipients.map((r) => (
+                      <span key={r.id} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-xs">
+                        {r.name}
+                        <button
+                          type="button"
+                          className="hover:text-red-600"
+                          onClick={() => {
+                            const id = String(r.id);
+                            setSelectedStaffIds(prev => prev.filter(x => x !== id));
+                            setExcludedStaffIds(prev => prev.filter(x => x !== id));
+                          }}
+                        >×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Close dropdown */}
+                <div className="mt-3 text-right">
+                  <button type="button" className="px-3 py-1.5 text-sm rounded-md bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200" onClick={() => setRecipientsOpen(false)}>Done</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Minimal Fields: Title and Body */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+        <div className="grid grid-cols-1 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Title</label>
+            <input
+              type="text"
+              value={formData.__title || ''}
+              onChange={(e) => setFormData(prev => ({ ...prev, __title: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Enter letter title"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Body</label>
+            <textarea
+              rows={8}
+              value={formData.__body || ''}
+              onChange={(e) => setFormData(prev => ({ ...prev, __body: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Type your letter body here..."
+              required
+            />
           </div>
         </div>
       </div>
@@ -437,103 +740,217 @@ export default function DynamicForm({ typeId, onLetterCreated, editingLetter, ed
               );
             }
 
-            // Replace recipient field with office + staff dropdowns for Staff template
-            if (isStaffType && (field.name === 'recipient_name' || field.name === 'recipient')) {
+            // Enhanced recipient selector UI (available for all templates)
+            if (field.name === 'recipient_name' || field.name === 'recipient') {
               return (
-                <div key={field.id || `${field.name}-${index}` } className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Select Office
+                <div key={field.id || `${field.name}-${index}` } className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Recipients</label>
+                  {/* Trigger button */}
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setRecipientsOpen(v => !v)}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow hover:shadow-md focus:ring-2 focus:ring-blue-400"
+                    >
+                      Select recipients
+                      {Array.isArray(formData.recipients) && formData.recipients.length > 0 && (
+                        <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg白/20">{formData.recipients.length} selected</span>
+                      )}
+                    </button>
+                    <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                      <input type="checkbox" checked={multiSelectMode} onChange={(e) => setMultiSelectMode(e.target.checked)} />
+                      Multi-select
                     </label>
-                    <div className="relative">
-                      <select
-                        value={selectedOffice}
-                        onChange={(e) => {
-                          setSelectedOffice(e.target.value);
-                          setSelectedStaff(''); // Reset staff selection
-                        }}
-                        className="w-full pr-10 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white appearance-none"
-                      >
-                        <option value="">All Offices</option>
-                        {offices.filter(o => o.is_active).map(o => (
-                          <option key={o.id} value={o.name}>{o.name}</option>
-                        ))}
-                      </select>
-                      <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.24 4.38a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-                      </svg>
-                    </div>
                   </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Recipient {selectedOffice && `(${staff.length} staff in ${selectedOffice})`}
-                    </label>
-                    <div className="relative">
-                      <select
-                        className="w-full pr-10 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white appearance-none"
-                        value={selectedStaff}
-                        onChange={(e) => {
-                          const staffId = e.target.value;
-                          setSelectedStaff(staffId);
-                          const s = staff.find(x => String(x.id) === String(staffId));
-                          if (s) {
-                            setFormData(prev => ({
-                              ...prev,
-                              recipient_name: s.name,
-                              recipient: s.name,
-                              recipient_title: s.position || '',
-                              recipient_company: s.office || '',
-                            }));
-                          }
-                        }}
-                        disabled={!selectedOffice && staff.length === 0}
-                      >
-                        <option value="">
-                          {selectedOffice ? 'Select Recipient' : 'Select an office first'}
-                        </option>
-                        {staff.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.name} {s.position ? `- ${s.position}` : ''}
-                          </option>
-                        ))}
-                      </select>
-                      <svg className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.24 4.38a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-                      </svg>
+
+                  {/* Dropdown panel */}
+                  {recipientsOpen && (
+                    <div className="relative mt-3">
+                      <div className="absolute z-20 w-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-2xl p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Offices */}
+                          <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <h5 className="font-semibold text-gray-800 dark:text-gray-200">Offices</h5>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+                                  onClick={() => {
+                                    const all = offices.filter(o => o.is_active).map(o => o.name);
+                                    setSelectedOffices(all);
+                                    setExcludedStaffIds([]);
+                                  }}
+                                >Select all</button>
+                                <button
+                                  type="button"
+                                  className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                                  onClick={() => {
+                                    setSelectedOffices([]);
+                                    setExcludedStaffIds([]);
+                                  }}
+                                >Unselect all</button>
+                              </div>
+                            </div>
+                            <div className="max-h-56 overflow-auto space-y-1">
+                              {offices.filter(o => o.is_active).map((o) => {
+                                const checked = selectedOffices.includes(o.name);
+                                return (
+                                  <label key={o.id} className={`flex items-center justify-between gap-3 px-3 py-2 rounded-lg cursor-pointer border ${checked ? 'bg-blue-50 border-blue-300 dark:bg-blue-950/50 dark:border-blue-800' : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800'}`}>
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setSelectedOffices(prev => Array.from(new Set([...prev, o.name])));
+                                            // When selecting an office, clear excludes for its staff
+                                            const idsToClear = staff.filter(s => s.office === o.name).map(s => String(s.id));
+                                            setExcludedStaffIds(prev => prev.filter(id => !idsToClear.includes(String(id))));
+                                          } else {
+                                            setSelectedOffices(prev => prev.filter(name => name !== o.name));
+                                            // No need to modify excluded list here
+                                          }
+                                        }}
+                                      />
+                                      <span className="font-medium text-gray-800 dark:text-gray-200">{o.name}</span>
+                                    </div>
+                                    <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
+                                      {staff.filter(s => s.office === o.name).length} staff
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Staff */}
+                          <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <h5 className="font-semibold text-gray-800 dark:text-gray-200">Staff</h5>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+                                  onClick={() => {
+                                    const ids = staff.map(s => String(s.id));
+                                    setSelectedStaffIds(ids);
+                                  }}
+                                >Select all</button>
+                                <button
+                                  type="button"
+                                  className="text-xs px-2 py-1 rounded bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                                  onClick={() => {
+                                    setSelectedStaffIds([]);
+                                    setExcludedStaffIds([]);
+                                  }}
+                                >Unselect all</button>
+                              </div>
+                            </div>
+                            <div className="max-h-56 overflow-auto divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-100 dark:border-gray-800">
+                              {staff.map((s) => {
+                                const fromOffice = selectedOffices.includes(s.office);
+                                const manually = selectedStaffIds.includes(String(s.id));
+                                const excluded = excludedStaffIds.includes(String(s.id));
+                                const effectiveChecked = (fromOffice && !excluded) || manually;
+                                return (
+                                  <div key={s.id} className={`flex items-center justify-between px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer ${effectiveChecked ? 'bg-green-50 dark:bg-green-900/20' : ''}`}
+                                    onClick={(e) => {
+                                      // row click: single or toggle depending on multiSelectMode and target
+                                      const clickedCheckbox = (e.target && e.target.tagName === 'INPUT');
+                                      if (clickedCheckbox) return; // handled by checkbox below
+                                      if (!multiSelectMode) {
+                                        // single select -> select only this staff
+                                        setSelectedOffices([]);
+                                        setExcludedStaffIds([]);
+                                        setSelectedStaffIds([String(s.id)]);
+                                        setRecipientsOpen(false);
+                                      } else {
+                                        // toggle like checkbox
+                                        const id = String(s.id);
+                                        const isSelected = effectiveChecked;
+                                        if (isSelected) {
+                                          // if selected via office, add to excludes; if via manual, remove manual
+                                          if (fromOffice && !excluded) setExcludedStaffIds(prev => Array.from(new Set([...prev, id])));
+                                          if (manually) setSelectedStaffIds(prev => prev.filter(x => x !== id));
+                                        } else {
+                                          setSelectedStaffIds(prev => Array.from(new Set([...prev, id])));
+                                          // also remove from excludes if present
+                                          setExcludedStaffIds(prev => prev.filter(x => x !== id));
+                                        }
+                                      }
+                                    }}
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <input
+                                        type="checkbox"
+                                        className="rounded"
+                                        checked={effectiveChecked}
+                                        onChange={(e) => {
+                                          const id = String(s.id);
+                                          if (e.target.checked) {
+                                            setSelectedStaffIds(prev => Array.from(new Set([...prev, id])));
+                                            setExcludedStaffIds(prev => prev.filter(x => x !== id));
+                                          } else {
+                                            // uncheck
+                                            if (selectedOffices.includes(s.office)) {
+                                              setExcludedStaffIds(prev => Array.from(new Set([...prev, id])));
+                                            }
+                                            setSelectedStaffIds(prev => prev.filter(x => x !== id));
+                                          }
+                                        }}
+                                      />
+                                      <div>
+                                        <div className="font-medium text-gray-900 dark:text-gray-100">{s.name}</div>
+                                        <div className="text-xs text-gray-600 dark:text-gray-400">{s.position || 'Staff'} • {s.office || 'Office'}</div>
+                                      </div>
+                                    </div>
+                                    {effectiveChecked && (
+                                      <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">Selected</span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div className="flex justify-end gap-2 mt-3">
+                              <button type="button" className="px-3 py-1.5 text-sm rounded-md bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200" onClick={() => setRecipientsOpen(false)}>Done</button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    {selectedOffice && staff.length === 0 && (
-                      <p className="mt-1 text-xs text-yellow-600 dark:text-yellow-400">
-                        No staff found in this office
-                      </p>
-                    )}
-                  </div>
+                  )}
+
+                  {/* Selected chips */}
+                  {Array.isArray(formData.recipients) && formData.recipients.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {formData.recipients.slice(0, 10).map(r => (
+                        <span key={r.id} className="inline-flex items-center gap-2 px-3 py-1.5 text-xs rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
+                          {r.name}
+                          <button type="button" className="ml-1 text-indigo-700 dark:text-indigo-300" onClick={() => {
+                            const id = String(r.id);
+                            setSelectedStaffIds(prev => prev.filter(x => x !== id));
+                            setExcludedStaffIds(prev => Array.from(new Set([...prev, id])));
+                          }}>×</button>
+                        </span>
+                      ))}
+                      {formData.recipients.length > 10 && (
+                        <span className="text-xs text-gray-600 dark:text-gray-300">+{formData.recipients.length - 10} more</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             }
-
-            const senderFields = ['sender_name', 'sender_position', 'sender_title', 'sender_company', 'company_name', 'phone', 'email', 'sender_email', 'contact_information'];
-            const isAutoFilled = senderFields.includes(field.name);
 
             return (
               <div key={field.id || `${field.name}-${index}` } className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
                 <label htmlFor={field.name} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                   {getFieldLabel(field.name)}
-                  {isAutoFilled && (
-                    <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded-full">
-                      Auto-filled
-                    </span>
-                  )}
                 </label>
 
                 {renderField(field)}
-
-                {isAutoFilled && (
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    This information is automatically filled from your profile
-                  </p>
-                )}
-                {field.description && !isAutoFilled && (
+                {field.description && (
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     {field.description}
                   </p>

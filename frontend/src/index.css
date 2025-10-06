@@ -119,6 +119,37 @@ h1 {
     size: A4 portrait;
     margin: 10mm;
   }
+
+  /* Fixed footer that repeats on every printed page */
+  .letter-footer {
+    position: fixed !important;
+    bottom: 10mm !important; /* matches @page bottom margin */
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 1 !important;
+  }
+  .letter-footer .printable-footer-inner {
+    width: 210mm !important;
+    margin: 0 auto !important;
+    padding: 0 20mm !important; /* match printable padding */
+    box-sizing: border-box !important;
+  }
+
+  /* Ensure content doesn't overlap the fixed footer */
+  .print-content {
+    padding-bottom: 35mm !important; /* reserve space above footer */
+    box-sizing: border-box !important;
+  }
+
+  /* Page break utility to force new printed page */
+  .page-break {
+    page-break-after: always !important;
+    break-after: page !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+  }
 }
 
 /* Print view isolation - when print button is clicked */
